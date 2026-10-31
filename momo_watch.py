@@ -7,6 +7,7 @@
     python3 momo_watch.py --loop 300   每 300 秒檢查一次，一直跑（給 Docker 用）
     python3 momo_watch.py --test       送一則測試推播
     python3 momo_watch.py --dry-run    只印結果，不推播、不記錄
+    python3 momo_watch.py --list       把即將開賣清單推播一次
 
 第一次執行只會把目前所有商品記下來（送一則「開始監測」），之後出現沒看過的商品才會通知。
 FUNBOX 的預購商品會記下開賣時間，開賣前 REMIND_BEFORE 分鐘再提醒一次。
@@ -66,6 +67,26 @@ def fetch_feed(keyword, extra, page):
             if node.get('@type') == 'ItemList':
                 items.extend(node.get('itemListElement', []))
     return items
+
+
+def short_url(code, url):
+    return 'https://www.momoshop.com.tw/product/' + code if code.isdigit() else url
+
+
+def short_name(name):
+    name = re.sub(r'^【TAKARA TOMY】\s*', '', name.strip())
+    return re.sub(r'^(BEYBLADE X\s*)?(戰鬥陀螺X?\s*)', '', name).strip() or name
+
+
+def sale_when(ms):
+    t = time.gmtime(ms / 1000 + 8 * 3600)
+    return '%d/%d(%s) %02d:%02d' % (t.tm_mon, t.tm_mday, '一二三四五六日'[t.tm_wday], t.tm_hour, t.tm_min)
+
+
+def upcoming_text(state):
+    rows = sorted(state.get('upcoming', {}).items(), key=lambda kv: kv[1]['on_sale'])
+    return '\n\n'.join('%s\n%s\n%s' % (sale_when(u['on_sale']), short_name(u['name']), short_url(k, u['url']))
+                       for k, u in rows) or '（目前沒有）'
 
 
 def normalize(item):
@@ -145,7 +166,8 @@ def send_reminders(state):
         # 排程可能延遲，所以開賣後 10 分鐘內沒提醒過也補發
         elif -600 * 1000 < left <= REMIND_BEFORE * 60 * 1000 and not u['reminded']:
             title = '%d 分鐘後開賣！' % round(left / 60000) if left > 0 else '已經開賣了！'
-            notify(title, '%s\n%s' % (u['desc'], u['name']), click=u['url'], tags=['alarm_clock'])
+            notify(title, '%s\n%s\n%s' % (sale_when(u['on_sale']), short_name(u['name']), short_url(code, u['url'])),
+                   click=short_url(code, u['url']), tags=['alarm_clock'])
             u['reminded'] = True
             log('開賣提醒：', code, u['name'])
 
@@ -167,12 +189,13 @@ def collect():
     return found
 
 
-def notify(title, message, click=None, tags=None):
+def notify(title, message, click=None, tags=None, button='開啟商品頁'):
     if not NTFY_TOPIC:
         raise RuntimeError('沒有設定 NTFY_TOPIC（GitHub：Settings → Secrets → Actions）')
     body = {'topic': NTFY_TOPIC, 'title': title, 'message': message}
     if click:
         body['click'] = click
+        body['actions'] = [{'action': 'view', 'label': button, 'url': click}]
     if tags:
         body['tags'] = tags
     req = urllib.request.Request(NTFY_SERVER, data=json.dumps(body).encode('utf-8'),
@@ -233,9 +256,7 @@ def check(dry_run=False):
                 log('讀取失敗，略過：', it['id'], e)
             time.sleep(2)
         save_state(state)
-        lines = ['%s %s' % (u['desc'], u['name']) for u in sorted(state['upcoming'].values(), key=lambda u: u['on_sale'])]
-        notify('MOMO 戰鬥陀螺監測已啟動',
-               '目前追蹤 %d 件商品，有新品上架會通知你。\n即將開賣：\n%s' % (len(found), '\n'.join(lines) or '（無）'), tags=['eyes'])
+        notify('監測已啟動｜FUNBOX 即將開賣 %d 款' % len(state['upcoming']), upcoming_text(state), tags=['eyes'])
         log('第一次執行，記錄 %d 件商品，即將開賣 %d 件' % (len(found), len(state['upcoming'])))
         return
 
@@ -266,8 +287,9 @@ def check(dry_run=False):
         except Exception as e:
             log('讀不到開賣資訊：', it['id'], e)
             status = '有貨' if it['stock'] == 'InStock' else it['stock']
-        msg = '$%s｜%s\n%s' % (it['price'], status, it['name'])
-        notify('MOMO 新陀螺上架！', msg, click=it['url'], tags=['tada'])
+        link = short_url(it['id'], it['url'])
+        msg = '%s\n$%s｜%s\n%s' % (short_name(it['name']), it['price'], status, link)
+        notify('FUNBOX 新陀螺上架！', msg, click=link, tags=['tada'])
         log('新品：', it['id'], it['name'], '｜', path)
     save_state(state)
     log('檢查完成：%d 件，新品 %d 件，通知 %d 件' % (len(found), len(new), hits))
@@ -278,6 +300,11 @@ def main():
     if '--test' in args:
         notify('MOMO 監測測試', '收到這則代表推播設定成功！', click='https://www.momoshop.com.tw/', tags=['bell'])
         log('已送出測試推播到', NTFY_TOPIC)
+        return
+    if '--list' in args:
+        state = load_state() or {}
+        notify('FUNBOX 即將開賣 %d 款' % len(state.get('upcoming', {})), upcoming_text(state), tags=['calendar'])
+        log('已送出即將開賣清單')
         return
     if '--loop' in args:
         interval = int(args[args.index('--loop') + 1])
