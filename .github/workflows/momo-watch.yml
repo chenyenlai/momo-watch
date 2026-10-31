@@ -1,0 +1,44 @@
+name: MOMO FUNBOX 陀螺監測
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # 每 5 分鐘（GitHub 常會延遲幾分鐘）
+  workflow_dispatch:
+    inputs:
+      test:
+        description: '只送一則測試推播'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # 要把 seen.json（看過的商品）存回倉庫
+
+concurrency:
+  group: momo-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+      REMIND_BEFORE: '30'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 送測試推播
+        if: ${{ inputs.test }}
+        run: python3 momo_watch.py --test
+
+      - name: 檢查新品與開賣提醒
+        if: ${{ !inputs.test }}
+        run: python3 momo_watch.py
+
+      - name: 儲存記錄
+        if: ${{ !inputs.test }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          [ -f seen.json ] && git add seen.json
+          git diff --cached --quiet || (git commit -m "更新監測記錄" && git push)
