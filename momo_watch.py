@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MOMO 戰鬥陀螺新品監測：FUNBOX（funbox toys 品牌館）有新陀螺上架就推播到手機（ntfy）。
+"""戰鬥陀螺新品監測：MOMO 上的 FUNBOX（funbox toys 品牌館）和 FUNBOX 官網，有新品或補貨就推播到手機（ntfy）。
 
 只用 Python 內建模組，NAS / Docker / 一般電腦都能跑。
 
@@ -38,6 +38,12 @@ EXCLUDE = ['鑰匙扣', '鑰匙圈', '掛件', '掛飾', '貼紙', '博博小鋪
 
 # 只通知商品分類路徑含這個字的（funbox toys 品牌館）；改成 '' 就是任何賣家都通知
 SELLER = 'funbox'
+
+# FUNBOX 官網（CYBERBIZ）分類的商品 JSON：新品、補貨都通知；APP 兌換券不算
+SHOP_FEEDS = [
+    'https://shop.funbox.com.tw/category_products/takaratomy/beyblade.json?limit=50&page=1&sort_by=sell_from-desc',
+]
+SHOP_SKIP = ['APP兌換']
 
 REMIND_BEFORE = int(os.environ.get('REMIND_BEFORE', '15'))  # 開賣前幾分鐘提醒；0 = 不提醒
 
@@ -172,6 +178,53 @@ def send_reminders(state):
             log('開賣提醒：', code, u['name'])
 
 
+def fetch_shop():
+    found = {}
+    for url in SHOP_FEEDS:
+        req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': 'application/json'})
+        for p in json.loads(urllib.request.urlopen(req, timeout=30).read().decode('utf-8')):
+            title = p.get('title', '')
+            if any(k in title for k in SHOP_SKIP):
+                continue
+            found[str(p['id'])] = {
+                'name': title,
+                'price': int(p.get('price') or 0),
+                'stock': sum(int(v.get('inventory_quantity') or 0) for v in p.get('variants', [])),
+                'url': 'https://shop.funbox.com.tw' + p.get('url', ''),
+            }
+        time.sleep(1)
+    return found
+
+
+def check_shop(state, dry_run=False):
+    """FUNBOX 官網：新商品上架、或庫存從 0 變成有貨時通知"""
+    try:
+        found = fetch_shop()
+    except Exception as e:
+        log('官網檢查失敗：', e)
+        return
+    if dry_run:
+        for k, it in found.items():
+            log('官網 %s  $%s  庫存 %s  %s' % (k, it['price'], it['stock'], it['name']))
+        return
+    known = state.get('shop')
+    state['shop'] = {k: {'name': it['name'], 'stock': it['stock']} for k, it in found.items()}
+    if known is None:  # 第一次只記錄
+        log('官網第一次執行，記錄 %d 件' % len(found))
+        return
+    for k, it in found.items():
+        msg = '%s\n$%s｜庫存 %d\n%s' % (short_name(it['name']), it['price'], it['stock'], it['url'])
+        if k not in known:
+            if it['stock'] > 0:
+                notify('FUNBOX 官網新品開賣中！快搶', msg, click=it['url'], tags=['rotating_light'], priority=5)
+            else:
+                notify('FUNBOX 官網新品上架', msg, click=it['url'], tags=['tada'], priority=4)
+            log('官網新品：', k, it['name'])
+        elif it['stock'] > 0 and known[k].get('stock', 0) <= 0:
+            notify('FUNBOX 官網補貨了！快搶', msg, click=it['url'], tags=['rotating_light'], priority=5)
+            log('官網補貨：', k, it['name'])
+
+
 def wanted(name):
     low = name.lower()
     return any(k in low for k in INCLUDE) and not any(k in low for k in EXCLUDE)
@@ -222,7 +275,10 @@ def check(dry_run=False):
     state = load_state()
     if state is not None and not dry_run:
         send_reminders(state)
+        check_shop(state)
         save_state(state)
+    if dry_run:
+        check_shop({}, dry_run=True)
     try:
         found = collect()
         if not found:
@@ -244,6 +300,7 @@ def check(dry_run=False):
 
     if state is None:
         state = {'seen': {k: v['name'] for k, v in found.items()}, 'fails': 0, 'upcoming': {}}
+        check_shop(state)
         # 找出目前已上架、還沒開賣的目標商品，之後才能提醒
         for it in found.values():
             if it['id'].startswith('TP'):
