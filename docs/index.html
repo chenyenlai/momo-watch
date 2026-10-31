@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的網頁</title>
+<style>
+:root { --bg:#f5f6f8; --card:#fff; --fg:#1d2330; --sub:#6b7280; --line:#e3e6eb; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#14171c; --card:#1e232b; --fg:#e8ebf0; --sub:#9aa3b2; --line:#2c333d; } }
+:root[data-theme="dark"] { --bg:#14171c; --card:#1e232b; --fg:#e8ebf0; --sub:#9aa3b2; --line:#2c333d; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif; padding:32px 16px; }
+main { max-width:480px; margin:0 auto; display:grid; gap:12px; }
+h1 { font-size:22px; margin:0 0 8px; }
+a { display:flex; align-items:center; gap:14px; padding:16px; background:var(--card); border:1px solid var(--line); border-radius:14px; color:inherit; text-decoration:none; }
+a:active { transform:scale(.99); }
+.ic { font-size:28px; }
+b { display:block; font-size:17px; }
+small { color:var(--sub); }
+</style>
+</head>
+<body>
+<main>
+<h1>我的網頁</h1>
+<a href="traffic.html"><span class="ic">🚗</span><span><b>國1 通勤路況</b><small>按「查詢路況」請家裡 NAS 抓即時資料</small></span></a>
+<a href="funbox.html"><span class="ic">🌀</span><span><b>FUNBOX 陀螺開賣表</b><small>MOMO 開賣行程與 FUNBOX 官網庫存</small></span></a>
+</main>
+</body>
+</html>
