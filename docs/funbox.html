@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FUNBOX 陀螺開賣表</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: 頂部「下一場開賣」倒數，下方依日期排的開賣行程（左欄日期、右欄商品），最後是已售完 */
+:root {
+  --bg: #eef1f5; --surface: #ffffff; --ink: #141a24; --muted: #5d6878; --line: #d5dbe4;
+  --accent: #e07f00; --accent-soft: #fff1da; --cobalt: #2448d8;
+  --ok: #17824a; --ok-bg: #e2f5ea; --out: #b3261e; --out-bg: #fbe5e3;
+  --display: "Chakra Petch", "Noto Sans TC", system-ui, sans-serif;
+  --body: "Noto Sans TC", system-ui, -apple-system, "Microsoft JhengHei", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f131a; --surface: #181e28; --ink: #e8edf4; --muted: #95a1b3; --line: #2a3342;
+  --accent: #ffb23f; --accent-soft: #3a2a0c; --cobalt: #8ea6ff;
+  --ok: #5fd197; --ok-bg: #12301f; --out: #ff8a80; --out-bg: #3a1513; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f131a; --surface: #181e28; --ink: #e8edf4; --muted: #95a1b3; --line: #2a3342;
+  --accent: #ffb23f; --accent-soft: #3a2a0c; --cobalt: #8ea6ff;
+  --ok: #5fd197; --ok-bg: #12301f; --out: #ff8a80; --out-bg: #3a1513; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 48px; }
+.wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 28px; }
+
+header { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--display); font-weight: 700; letter-spacing: .14em; font-size: 12px; color: var(--accent); text-transform: uppercase; }
+h1 { margin: 0; font-weight: 900; font-size: clamp(26px, 4.4vw, 40px); line-height: 1.15; text-wrap: balance; }
+.sub { margin: 0; color: var(--muted); max-width: 62ch; }
+
+.next { display: grid; grid-template-columns: 120px 1fr; gap: 18px; align-items: center; background: var(--surface);
+  border: 2px solid var(--accent); border-radius: 12px; padding: 16px; }
+.next img { width: 120px; height: 120px; object-fit: contain; background: #fff; border-radius: 8px; max-width: 100%; }
+.next .lbl { font-size: 12px; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.next .t { font-weight: 700; font-size: 17px; line-height: 1.4; }
+.clock { font: 700 clamp(28px, 6vw, 44px) var(--display); font-variant-numeric: tabular-nums; letter-spacing: .02em; line-height: 1.1; }
+.clock small { font-size: .45em; color: var(--muted); margin: 0 6px 0 2px; font-weight: 500; }
+.next a { color: var(--cobalt); font-size: 14px; }
+
+h2 { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: baseline; gap: 10px; }
+h2 .n { font: 500 14px var(--display); color: var(--muted); }
+
+.day { display: grid; grid-template-columns: 84px 1fr; gap: 14px; padding-block: 14px; border-top: 1px solid var(--line); }
+.date { display: grid; align-content: start; }
+.date b { font: 700 28px var(--display); line-height: 1; font-variant-numeric: tabular-nums; }
+.date span { font-size: 13px; color: var(--muted); }
+.date.today b { color: var(--accent); }
+.list { display: grid; gap: 10px; min-width: 0; }
+
+.item { display: grid; grid-template-columns: 76px 1fr auto; gap: 14px; align-items: center; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px; color: inherit; text-decoration: none; min-width: 0; }
+.item:hover { border-color: var(--accent); }
+.item:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+.item img { width: 76px; height: 76px; object-fit: contain; background: #fff; border-radius: 6px; max-width: 100%; }
+.item.is-out img { opacity: .45; filter: grayscale(.6); }
+.mid { display: grid; gap: 4px; min-width: 0; }
+.codes { display: flex; flex-wrap: wrap; gap: 4px; }
+.code { font: 700 12px var(--display); letter-spacing: .04em; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--cobalt); }
+.name { font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.meta { font-size: 12px; color: var(--muted); }
+.right { display: grid; justify-items: end; gap: 4px; text-align: right; }
+.time { font: 700 18px var(--display); font-variant-numeric: tabular-nums; }
+.price { font: 500 14px var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pill { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--accent-soft); color: var(--accent); }
+.pill.live { background: var(--ok-bg); color: var(--ok); }
+.pill.out { background: var(--out-bg); color: var(--out); }
+
+.soldout, .shop { display: grid; gap: 10px; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+#refresh { border: 0; background: var(--accent); color: #fff; font: 700 15px var(--body); padding: 9px 18px; border-radius: 999px; cursor: pointer; }
+:root[data-theme="dark"] #refresh { color: #1b1200; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) #refresh { color: #1b1200; } }
+#refresh:disabled { opacity: .55; cursor: default; }
+.status { font-size: 13px; color: var(--muted); min-height: 20px; }
+.status.warn { color: var(--out); }
+.empty { color: var(--muted); padding: 18px 0; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: r .8s linear infinite; vertical-align: -1px; margin-right: 6px; }
+@keyframes r { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+footer { font-size: 12.5px; color: var(--muted); max-width: 72ch; }
+
+@media (max-width: 560px) {
+  .next { grid-template-columns: 84px 1fr; } .next img { width: 84px; height: 84px; }
+  .day { grid-template-columns: 1fr; gap: 8px; }
+  .date { display: flex; gap: 8px; align-items: baseline; }
+  .item { grid-template-columns: 64px 1fr; } .item img { width: 64px; height: 64px; }
+  .right { grid-column: 2; justify-items: start; text-align: left; grid-auto-flow: column; justify-content: start; align-items: center; gap: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">funbox toys · BEYBLADE X</div>
+    <div class="top">
+      <h1>FUNBOX 陀螺開賣表</h1>
+      <button id="refresh" type="button">更新</button>
+    </div>
+    <p class="sub">FUNBOX 在 MOMO 上架的戰鬥陀螺，依開賣時間排列；點商品會開商品頁。按「更新」會請家裡的 NAS 重新查一次開賣時間與庫存（約 15 秒）。</p>
+    <div class="status" id="status"></div>
+  </header>
+
+  <section id="next" aria-label="下一場開賣"></section>
+
+  <section>
+    <h2>開賣行程 <span class="n" id="upcount"></span></h2>
+    <div id="days"></div>
+  </section>
+
+  <section class="shop">
+    <h2>FUNBOX 官網 <span class="n" id="shopcount"></span></h2>
+    <div class="list" id="shoplist"></div>
+  </section>
+
+  <section class="soldout">
+    <h2>已售完 <span class="n" id="outcount"></span></h2>
+    <div class="list" id="out"></div>
+  </section>
+
+  <footer>從 MOMO 搜尋結果找出分類在「funbox toys」品牌館的陀螺，開賣時間與庫存取自商品頁；官網資料取自 shop.funbox.com.tw。實際能不能買請以商品頁為準。NAS 上的監測程式會在 FUNBOX 上新品時推播，並在開賣前 15 分鐘提醒。</footer>
+</div>
+
+<script>
+const NTFY = "https://ntfy.sh"
+const REQ = "funbox-web-9a3d5e07b2"
+const DATA = "funbox-data-2e8c7a41f6"
+const WAIT_MS = 75000
+const WEEK = ['日', '一', '二', '三', '四', '五', '六']
+const TZ = 8 * 3600 * 1000 // 台灣時間
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const tw = ms => { const d = new Date(ms + TZ); return { m: d.getUTCMonth() + 1, d: d.getUTCDate(), w: d.getUTCDay(), hh: String(d.getUTCHours()).padStart(2, '0'), mm: String(d.getUTCMinutes()).padStart(2, '0') } }
+const codesOf = name => [...new Set((name.match(/\b[BUC]X-?\d{1,3}\b/gi) || []).map(c => c.toUpperCase().replace(/^([BUC]X)-?/, '$1-')))]
+const shortName = n => n.replace(/^【TAKARA TOMY】\s*/, '').replace(/^BEYBLADE X\s*/, '').replace(/^戰鬥陀螺\s*/, '')
+const momoUrl = id => `https://www.momoshop.com.tw/goods/GoodsDetail.jsp?i_code=${id}`
+const momoImg = id => /^\d{8}$/.test(id) ? `https://img1.momoshop.com.tw/goodsimg/00${id.slice(0, 2)}/${id.slice(2, 5)}/${id.slice(5)}/${id}_O_m.jpg` : ''
+const pad = n => String(n).padStart(2, '0')
+
+let DATA_NOW = null, busy = false
+
+async function decode(msg) {
+  if (!msg.startsWith('gz:')) return JSON.parse(msg)
+  const bytes = Uint8Array.from(atob(msg.slice(3)), c => c.charCodeAt(0))
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
+  return JSON.parse(await new Response(stream).text())
+}
+
+async function latest(sinceSec) {
+  const r = await fetch(`${NTFY}/${DATA}/json?poll=1&since=${sinceSec}`, { cache: 'no-store' })
+  let best = null
+  for (const line of (await r.text()).split('\n')) {
+    if (!line.trim()) continue
+    try {
+      const ev = JSON.parse(line)
+      if (ev.event !== 'message') continue
+      const p = await decode(ev.message)
+      if (p.v === 1 && (!best || best.ts < p.ts)) best = p
+    } catch (e) { /* 不是網頁資料，略過 */ }
+  }
+  if (best && (!DATA_NOW || DATA_NOW.ts < best.ts)) DATA_NOW = best
+}
+
+function left(ms) {
+  const s = Math.max(0, Math.floor((ms - Date.now()) / 1000))
+  return { d: Math.floor(s / 86400), h: Math.floor(s % 86400 / 3600), m: Math.floor(s % 3600 / 60), s: s % 60, done: s === 0 }
+}
+
+function itemHTML(it, showTime) {
+  const t = tw(it.onSale)
+  const live = it.onSale && it.onSale <= Date.now()
+  const pill = !it.hasStock ? '<span class="pill out">售完</span>'
+    : live || !it.onSale ? '<span class="pill live">開賣中</span>' : `<span class="pill" data-cd="${it.onSale}"></span>`
+  const img = momoImg(it.id)
+  return `<a class="item${it.hasStock ? '' : ' is-out'}" href="${esc(momoUrl(it.id))}" target="_blank" rel="noopener">
+    ${img ? `<img src="${img}" alt="" loading="lazy">` : '<span></span>'}
+    <div class="mid">
+      <div class="codes">${codesOf(it.name).map(c => `<span class="code">${c}</span>`).join('')}</div>
+      <div class="name">${esc(shortName(it.name))}</div>
+      ${it.limit ? `<div class="meta">${esc(it.limit)}</div>` : ''}
+    </div>
+    <div class="right">
+      ${showTime ? `<span class="time">${t.hh}:${t.mm}</span>` : ''}
+      <span class="price">$${Number(it.price).toLocaleString('zh-TW')}</span>
+      ${pill}
+    </div>
+  </a>`
+}
+
+function shopHTML(it) {
+  const pill = it.stock > 0 ? `<span class="pill live">有貨 ${it.stock}</span>` : '<span class="pill out">售完</span>'
+  return `<a class="item${it.stock > 0 ? '' : ' is-out'}" href="${esc(it.url)}" target="_blank" rel="noopener">
+    ${it.img ? `<img src="${esc(it.img)}" alt="" loading="lazy">` : '<span></span>'}
+    <div class="mid">
+      <div class="codes">${codesOf(it.name).map(c => `<span class="code">${c}</span>`).join('')}</div>
+      <div class="name">${esc(shortName(it.name))}</div>
+    </div>
+    <div class="right">
+      <span class="price">$${Number(it.price).toLocaleString('zh-TW')}</span>
+      ${pill}
+    </div>
+  </a>`
+}
+
+function render(note) {
+  const st = document.getElementById('status')
+  st.className = 'status'
+  const at = DATA_NOW ? (() => { const t = tw(DATA_NOW.ts * 1000); return `${t.m}/${t.d} ${t.hh}:${t.mm}` })() : ''
+  if (busy) st.innerHTML = `<span class="spin"></span>請 NAS 查詢中…（約 15 秒）`
+  else if (note) { st.textContent = note; st.className = 'status warn' }
+  else st.textContent = DATA_NOW ? `資料時間 ${at}` : ''
+  if (!DATA_NOW) {
+    document.getElementById('days').innerHTML = `<div class="empty">${busy ? '查詢中…' : '按「更新」取得最新開賣資訊'}</div>`
+    return
+  }
+  const items = DATA_NOW.items
+  const upcoming = items.filter(i => i.hasStock).sort((a, b) => (a.onSale || 0) - (b.onSale || 0))
+  const soldout = items.filter(i => !i.hasStock)
+
+  const nx = upcoming.find(i => i.onSale > Date.now())
+  const box = document.getElementById('next')
+  if (nx) {
+    const t = tw(nx.onSale)
+    box.innerHTML = `<div class="next">
+      <img src="${momoImg(nx.id)}" alt="">
+      <div>
+        <div class="lbl">下一場開賣 · ${t.m}/${t.d}（${WEEK[t.w]}）${t.hh}:${t.mm}</div>
+        <div class="t">${esc(shortName(nx.name))}</div>
+        <div class="clock" id="clock" data-at="${nx.onSale}"></div>
+        <a href="${esc(momoUrl(nx.id))}" target="_blank" rel="noopener">開啟商品頁</a>
+      </div>
+    </div>`
+  } else box.innerHTML = ''
+
+  const groups = new Map()
+  for (const it of upcoming) {
+    const t = tw(it.onSale || Date.now())
+    const k = it.onSale > Date.now() ? `${t.m}/${t.d}` : '開賣中'
+    if (!groups.has(k)) groups.set(k, { t, list: [] })
+    groups.get(k).list.push(it)
+  }
+  const today = tw(Date.now())
+  document.getElementById('days').innerHTML = upcoming.length ? [...groups].map(([k, g]) => `
+    <div class="day">
+      <div class="date${k === '開賣中' || (g.t.m === today.m && g.t.d === today.d) ? ' today' : ''}"><b>${k === '開賣中' ? '現在' : k}</b><span>${k === '開賣中' ? '開賣中' : `星期${WEEK[g.t.w]}`}</span></div>
+      <div class="list">${g.list.map(it => itemHTML(it, k !== '開賣中')).join('')}</div>
+    </div>`).join('') : '<div class="empty">目前沒有待開賣的商品</div>'
+  document.getElementById('upcount').textContent = `${upcoming.length} 款`
+  document.getElementById('out').innerHTML = soldout.map(it => itemHTML(it, false)).join('')
+  document.getElementById('outcount').textContent = `${soldout.length} 款`
+  const shop = DATA_NOW.shop || []
+  document.getElementById('shoplist').innerHTML = shop.map(shopHTML).join('') || '<div class="empty">沒有資料</div>'
+  document.getElementById('shopcount').textContent = `${shop.length} 款`
+  tick()
+}
+
+function tick() {
+  const c = document.getElementById('clock')
+  if (c) {
+    const l = left(+c.dataset.at)
+    c.innerHTML = l.done ? '開賣了！' : `${l.d ? `${l.d}<small>天</small>` : ''}${pad(l.h)}<small>時</small>${pad(l.m)}<small>分</small>${pad(l.s)}<small>秒</small>`
+  }
+  for (const el of document.querySelectorAll('[data-cd]')) {
+    const l = left(+el.dataset.cd)
+    if (l.done) { el.textContent = '開賣中'; el.className = 'pill live'; el.removeAttribute('data-cd') }
+    else el.textContent = l.d ? `${l.d} 天 ${l.h} 小時後` : `${pad(l.h)}:${pad(l.m)}:${pad(l.s)} 後`
+  }
+}
+
+async function loadCached() {
+  try { await latest(Math.floor(Date.now() / 1000 - 12 * 3600)) } catch (e) { /* 離線就算了 */ }
+  if (!busy) render()
+}
+
+async function refresh() {
+  if (busy) return
+  busy = true
+  document.getElementById('refresh').disabled = true
+  render()
+  const t0 = Date.now() / 1000
+  let note = ''
+  try {
+    await fetch(`${NTFY}/${REQ}`, { method: 'POST', body: 'update' })
+    const deadline = Date.now() + WAIT_MS
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 3000))
+      await latest(Math.floor(t0 - 90))
+      if (DATA_NOW && DATA_NOW.ts >= t0 - 70) break
+    }
+    if (!DATA_NOW || DATA_NOW.ts < t0 - 70) note = 'NAS 沒有回應（可能關機或斷線），顯示的是之前的資料'
+  } catch (e) {
+    note = '連線失敗，請檢查網路'
+  }
+  busy = false
+  document.getElementById('refresh').disabled = false
+  render(note)
+}
+
+document.getElementById('refresh').addEventListener('click', refresh)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') loadCached() })
+loadCached()
+setInterval(tick, 1000)
+</script>
+</body>
+</html>
