@@ -39,11 +39,12 @@ EXCLUDE = ['鑰匙扣', '鑰匙圈', '掛件', '掛飾', '貼紙', '博博小鋪
 # 只通知商品分類路徑含這個字的（funbox toys 品牌館）；改成 '' 就是任何賣家都通知
 SELLER = 'funbox'
 
-# FUNBOX 官網（CYBERBIZ）分類的商品 JSON：新品、補貨都通知；APP 兌換券不算
+# FUNBOX 官網（CYBERBIZ）分類的商品 JSON：新品上架就通知；APP 兌換券不算
 SHOP_FEEDS = [
     'https://shop.funbox.com.tw/category_products/takaratomy/beyblade.json?limit=50&page=1&sort_by=sell_from-desc',
 ]
 SHOP_SKIP = ['APP兌換']
+SHOP_RESTOCK = False  # True = 庫存從 0 變有貨也通知
 
 REMIND_BEFORE = int(os.environ.get('REMIND_BEFORE', '15'))  # 開賣前幾分鐘提醒；0 = 不提醒
 
@@ -197,7 +198,7 @@ def fetch_shop():
 
 
 def check_shop(state, dry_run=False):
-    """FUNBOX 官網：新商品上架、或庫存從 0 變成有貨時通知"""
+    """FUNBOX 官網：新商品上架時通知（SHOP_RESTOCK 開啟時，補貨也通知）"""
     try:
         found = fetch_shop()
     except Exception as e:
@@ -220,7 +221,7 @@ def check_shop(state, dry_run=False):
             else:
                 notify('FUNBOX 官網新品上架', msg, click=it['url'], tags=['tada'], priority=4)
             log('官網新品：', k, it['name'])
-        elif it['stock'] > 0 and known[k].get('stock', 0) <= 0:
+        elif SHOP_RESTOCK and it['stock'] > 0 and known[k].get('stock', 0) <= 0:
             notify('FUNBOX 官網補貨了！快搶', msg, click=it['url'], tags=['rotating_light'], priority=5)
             log('官網補貨：', k, it['name'])
 
