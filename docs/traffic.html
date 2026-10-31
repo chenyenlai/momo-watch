@@ -36,8 +36,8 @@ h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
 .seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
 .seg small { font-weight: 400; margin-left: 4px; }
 #refresh {
-  border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 14px;
-  padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  border: 0; background: var(--accent); color: #fff; font: inherit; font-size: 15px; font-weight: 600;
+  padding: 8px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
 }
 #refresh:disabled { opacity: .55; }
 .meta { color: var(--muted); font-size: 13px; margin: 0 2px 12px; min-height: 20px; }
@@ -78,7 +78,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 20px; line-height: 1.
 <main>
   <header>
     <h1>國1 通勤路況</h1>
-    <button id="refresh" type="button">重新整理</button>
+    <button id="refresh" type="button">查詢路況</button>
   </header>
   <div class="seg" role="group" aria-label="方向">
     <button type="button" data-mode="am">上班<small>北上</small></button>
@@ -96,7 +96,6 @@ const NTFY = "https://ntfy.sh"
 const REQ = "commute-web-3d6f29b8e1"
 const DATA = "commute-data-7c41a5e09f"
 const WAIT_MS = 25000
-const AUTO_MS = 3 * 60 * 1000
 
 const $ = s => document.querySelector(s)
 const state = { mode: new Date(Date.now() + 8 * 3600e3).getUTCHours() < 12 ? "am" : "pm", data: {}, busy: false, token: 0 }
@@ -136,7 +135,7 @@ function render(note) {
     meta.textContent = `${hhmm(p.ts)} 更新${age >= 1 ? `（${age} 分鐘前）` : ""}`
     if (age >= 5) meta.className = "meta stale"
   } else meta.textContent = ""
-  if (!p) { $("#view").innerHTML = state.busy ? `<div class="empty">查詢中…</div>` : `<div class="empty">還沒有資料</div>`; return }
+  if (!p) { $("#view").innerHTML = state.busy ? `<div class="empty">查詢中…</div>` : `<div class="empty">按右上角「查詢路況」取得最新路況</div>`; return }
 
   const bad = p.events.length > 0
   let html = `<div class="banner ${bad ? "bad" : "ok"}">${esc(p.status)}</div>`
@@ -172,6 +171,13 @@ function render(note) {
   $("#view").innerHTML = html
 }
 
+// 只讀取最近一次查詢的結果（不會叫 NAS 查，也不花推播額度）
+async function loadCached() {
+  try { merge(await latest(Math.floor(Date.now() / 1000 - 12 * 3600))) } catch (e) { /* 離線就算了 */ }
+  if (!state.busy) render()
+}
+
+// 按「查詢路況」才請 NAS 去抓
 async function refresh() {
   if (state.busy) return
   const token = ++state.token, mode = state.mode, t0 = Date.now() / 1000
@@ -208,15 +214,11 @@ document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click"
   state.token++
   $("#refresh").disabled = false
   render()
-  refresh()
+  loadCached()
 }))
 $("#refresh").addEventListener("click", refresh)
-document.addEventListener("visibilitychange", () => {
-  const p = state.data[state.mode]
-  if (document.visibilityState === "visible" && (!p || Date.now() / 1000 - p.ts > 120)) refresh()
-})
-setInterval(() => { if (document.visibilityState === "visible") refresh() }, AUTO_MS)
-refresh()
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadCached() })
+loadCached()
 </script>
 </body>
 </html>
