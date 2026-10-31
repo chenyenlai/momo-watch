@@ -167,7 +167,7 @@ def send_reminders(state):
         elif -600 * 1000 < left <= REMIND_BEFORE * 60 * 1000 and not u['reminded']:
             title = '%d 分鐘後開賣！' % round(left / 60000) if left > 0 else '已經開賣了！'
             notify(title, '%s\n%s\n%s' % (sale_when(u['on_sale']), short_name(u['name']), short_url(code, u['url'])),
-                   click=short_url(code, u['url']), tags=['alarm_clock'])
+                   click=short_url(code, u['url']), tags=['alarm_clock'], priority=5)
             u['reminded'] = True
             log('開賣提醒：', code, u['name'])
 
@@ -189,10 +189,10 @@ def collect():
     return found
 
 
-def notify(title, message, click=None, tags=None, button='開啟商品頁'):
+def notify(title, message, click=None, tags=None, button='開啟商品頁', priority=3):
     if not NTFY_TOPIC:
         raise RuntimeError('沒有設定 NTFY_TOPIC（GitHub：Settings → Secrets → Actions）')
-    body = {'topic': NTFY_TOPIC, 'title': title, 'message': message}
+    body = {'topic': NTFY_TOPIC, 'title': title, 'message': message, 'priority': priority}
     if click:
         body['click'] = click
         body['actions'] = [{'action': 'view', 'label': button, 'url': click}]
@@ -278,8 +278,10 @@ def check(dry_run=False):
             log('新品（非目標賣家，略過）：', it['id'], it['name'], '｜', path)
             continue
         hits += 1
+        selling = False
         try:
             info = sale_info(it['id'])
+            selling = info['stock'] and info['on_sale'] <= time.time() * 1000
             status = status_text(info)
             if info['limit']:
                 status += '｜' + info['limit']
@@ -289,7 +291,10 @@ def check(dry_run=False):
             status = '有貨' if it['stock'] == 'InStock' else it['stock']
         link = short_url(it['id'], it['url'])
         msg = '%s\n$%s｜%s\n%s' % (short_name(it['name']), it['price'], status, link)
-        notify('FUNBOX 新陀螺上架！', msg, click=link, tags=['tada'])
+        if selling:  # 上架就能買：最高優先度，手機會長震動
+            notify('FUNBOX 新陀螺開賣中！快搶', msg, click=link, tags=['rotating_light'], priority=5)
+        else:
+            notify('FUNBOX 新陀螺上架！', msg, click=link, tags=['tada'], priority=4)
         log('新品：', it['id'], it['name'], '｜', path)
     save_state(state)
     log('檢查完成：%d 件，新品 %d 件，通知 %d 件' % (len(found), len(new), hits))
