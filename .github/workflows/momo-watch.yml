@@ -25,7 +25,7 @@ jobs:
       NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
       REMIND_BEFORE: '30'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: 送測試推播
         if: ${{ inputs.test }}
