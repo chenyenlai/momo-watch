@@ -98,5 +98,23 @@
    "desc": "11/3 00:00 開賣",
    "reminded": false
   }
+ },
+ "shop": {
+  "50951590": {
+   "name": "BEYBLADE X 戰鬥陀螺 BX-37 雙重極限衝擊戰鬥盤 豪華組",
+   "stock": 28
+  },
+  "66047423": {
+   "name": "BEYBLADE X 戰鬥陀螺 CX-16 極限衝擊對戰組C",
+   "stock": 80
+  },
+  "71618748": {
+   "name": "BEYBLADE X 戰鬥陀螺 CX-00 新世紀福音戰士改造組",
+   "stock": 0
+  },
+  "72336042": {
+   "name": "BEYBLADE X 戰鬥陀螺 CX-19 鱷魚裂甲 隨機強化組",
+   "stock": 0
+  }
  }
 }
