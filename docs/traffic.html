@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>國1 通勤路況</title>
+<meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16181b" media="(prefers-color-scheme: dark)">
+<style>
+:root {
+  --bg: #f6f5f2; --card: #ffffff; --ink: #1d1f22; --muted: #6b6f76; --line: #e4e2dd;
+  --ok: #1f7a4d; --ok-bg: #e6f3ec; --warn: #a15c00; --bad: #b3261e; --bad-bg: #fbe9e7;
+  --accent: #2b5fd9; --chip: #efeee9;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181b; --card: #1f2226; --ink: #eceae6; --muted: #9a9ea6; --line: #2e3237;
+    --ok: #5fcf95; --ok-bg: #173226; --warn: #e8a43c; --bad: #ff8a80; --bad-bg: #3a1d1b;
+    --accent: #7ea2ff; --chip: #2a2e33;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: 560px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 16px 40px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--chip); border-radius: 12px; padding: 4px; margin-bottom: 12px; }
+.seg button {
+  border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 600;
+  padding: 9px 0; border-radius: 9px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+.seg small { font-weight: 400; margin-left: 4px; }
+#refresh {
+  border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 14px;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+}
+#refresh:disabled { opacity: .55; }
+.meta { color: var(--muted); font-size: 13px; margin: 0 2px 12px; min-height: 20px; }
+.meta.stale { color: var(--warn); }
+.banner { border-radius: 14px; padding: 14px 16px; font-weight: 700; font-size: 17px; margin-bottom: 12px; }
+.banner.ok { background: var(--ok-bg); color: var(--ok); }
+.banner.bad { background: var(--bad-bg); color: var(--bad); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px; margin-bottom: 12px; }
+.card h2 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 12px 0 2px; letter-spacing: .04em; }
+.route { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 11px 0; border-top: 1px solid var(--line); }
+.card h2 + .route, .card > .route:first-child { border-top: 0; }
+.route.branch .name { padding-left: 14px; position: relative; }
+.route.branch .name::before { content: ""; position: absolute; left: 2px; top: .25em; bottom: .25em; width: 3px; border-radius: 2px; background: var(--line); }
+.route .min { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; line-height: 1.1; }
+.route .min small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+.route .spd { grid-column: 2; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+.route .slow { grid-column: 1 / -1; font-size: 13px; color: var(--bad); }
+.route.branch .slow { padding-left: 14px; }
+.route .na { color: var(--muted); }
+.fast { color: var(--ok); } .mid { color: var(--warn); } .crawl { color: var(--bad); }
+.event { padding: 12px 0; border-top: 1px solid var(--line); }
+.event:first-of-type { border-top: 0; }
+.event .where { font-weight: 700; }
+.tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 6px; margin-right: 6px; vertical-align: 1px; }
+.tag.v { background: #e9e0ff; color: #5b3cc4; } .tag.s { background: var(--chip); color: var(--ink); }
+@media (prefers-color-scheme: dark) { .tag.v { background: #33285a; color: #c8b8ff; } }
+.event .line { font-size: 14px; color: var(--muted); }
+.event .line.what { color: var(--ink); }
+.err { color: var(--warn); font-size: 14px; margin: 0 2px 12px; }
+.empty { color: var(--muted); text-align: center; padding: 28px 0; }
+footer { color: var(--muted); font-size: 12px; margin-top: 20px; line-height: 1.7; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: r .8s linear infinite; vertical-align: -1px; margin-right: 6px; }
+@keyframes r { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>國1 通勤路況</h1>
+    <button id="refresh" type="button">重新整理</button>
+  </header>
+  <div class="seg" role="group" aria-label="方向">
+    <button type="button" data-mode="am">上班<small>北上</small></button>
+    <button type="button" data-mode="pm">下班<small>南下</small></button>
+  </div>
+  <p class="meta" id="meta"></p>
+  <div id="view"><div class="empty">載入中…</div></div>
+  <footer>
+    國道 1 號 14–50K（含汐五／五楊高架）。資料：高公局即時事件與路段車速、警廣即時路況。<br>
+    由家裡的 NAS 即時抓取（這些資料只開放台灣網路），NAS 關機時無法更新。
+  </footer>
+</main>
+<script>
+const NTFY = "https://ntfy.sh"
+const REQ = "commute-web-3d6f29b8e1"
+const DATA = "commute-data-7c41a5e09f"
+const WAIT_MS = 25000
+const AUTO_MS = 3 * 60 * 1000
+
+const $ = s => document.querySelector(s)
+const state = { mode: new Date(Date.now() + 8 * 3600e3).getUTCHours() < 12 ? "am" : "pm", data: {}, busy: false, token: 0 }
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]))
+const hhmm = ts => new Date(ts * 1000 + 8 * 3600e3).toISOString().slice(11, 16)
+const speedClass = v => v >= 80 ? "fast" : v >= 60 ? "mid" : "crawl"
+
+async function latest(sinceSec) {
+  const r = await fetch(`${NTFY}/${DATA}/json?poll=1&since=${sinceSec}`, { cache: "no-store" })
+  const out = {}
+  for (const line of (await r.text()).split("\n")) {
+    if (!line.trim()) continue
+    try {
+      const ev = JSON.parse(line)
+      if (ev.event !== "message") continue
+      const p = JSON.parse(ev.message)
+      if (p.v === 1 && (!out[p.mode] || out[p.mode].ts < p.ts)) out[p.mode] = p
+    } catch (e) { /* 不是網頁資料，略過 */ }
+  }
+  return out
+}
+
+function merge(found) {
+  for (const [m, p] of Object.entries(found)) if (!state.data[m] || state.data[m].ts < p.ts) state.data[m] = p
+}
+
+function render(note) {
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode)))
+  const p = state.data[state.mode]
+  const meta = $("#meta")
+  meta.className = "meta"
+  if (state.busy) meta.innerHTML = `<span class="spin"></span>向 NAS 查詢中…${p ? `（先顯示 ${hhmm(p.ts)} 的資料）` : ""}`
+  else if (note) { meta.textContent = note; meta.className = "meta stale" }
+  else if (p) {
+    const age = Math.round((Date.now() / 1000 - p.ts) / 60)
+    meta.textContent = `${hhmm(p.ts)} 更新${age >= 1 ? `（${age} 分鐘前）` : ""}`
+    if (age >= 5) meta.className = "meta stale"
+  } else meta.textContent = ""
+  if (!p) { $("#view").innerHTML = state.busy ? `<div class="empty">查詢中…</div>` : `<div class="empty">還沒有資料</div>`; return }
+
+  const bad = p.events.length > 0
+  let html = `<div class="banner ${bad ? "bad" : "ok"}">${esc(p.status)}</div>`
+  if (p.routes.length) {
+    html += `<section class="card">`
+    let grouped = false
+    for (const r of p.routes) {
+      if (r.branch && !grouped) { html += `<h2>${esc(p.groupLabel.replace("：", ""))}</h2>`; grouped = true }
+      html += `<div class="route${r.branch ? " branch" : ""}"><div class="name">${esc(r.label)}</div>`
+      if (!r.ok) html += `<div class="min na">無資料</div>`
+      else {
+        html += `<div class="min">${r.minutes}<small>分</small></div>`
+        html += `<div class="spd ${speedClass(r.speed)}">均速 ${r.speed}${r.partial ? "・部分無資料" : ""}</div>`
+        if (r.slow.length) html += `<div class="slow">⚠️ ${esc(r.slow.join("、"))} km/h</div>`
+      }
+      html += `</div>`
+    }
+    html += `</section>`
+  }
+  if (bad) {
+    html += `<section class="card"><h2>事故／故障</h2>`
+    for (const e of p.events) {
+      const [where, what, ...rest] = e.lines
+      const w = where.replace(/^•\s*\[(高架|平面)\]\s*/, "")
+      html += `<div class="event"><div class="where"><span class="tag ${e.viaduct ? "v" : "s"}">${e.viaduct ? "高架" : "平面"}</span>${esc(w)}</div>`
+      html += `<div class="line what">${esc(what.trim())}</div>`
+      for (const l of rest) html += `<div class="line">${esc(l.trim())}</div>`
+      html += `</div>`
+    }
+    html += `</section>`
+  }
+  if (p.errors.length) html += `<p class="err">⚠️ 抓取失敗：${esc(p.errors.join("、"))}</p>`
+  $("#view").innerHTML = html
+}
+
+async function refresh() {
+  if (state.busy) return
+  const token = ++state.token, mode = state.mode, t0 = Date.now() / 1000
+  state.busy = true
+  $("#refresh").disabled = true
+  render()
+  let note = ""
+  try {
+    merge(await latest(Math.floor(t0 - 900)))
+    render()
+    await fetch(`${NTFY}/${REQ}`, { method: "POST", body: mode })
+    const deadline = Date.now() + WAIT_MS
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 1500))
+      merge(await latest(Math.floor(t0 - 60)))
+      const p = state.data[mode]
+      if (p && p.ts >= t0 - 50) break
+    }
+    const p = state.data[mode]
+    if (!p || p.ts < t0 - 50) note = p ? `NAS 沒有回應，顯示的是 ${hhmm(p.ts)} 的資料` : "NAS 沒有回應（可能關機或斷線）"
+  } catch (e) {
+    note = "連線失敗，請檢查網路"
+  }
+  if (token !== state.token) return
+  state.busy = false
+  $("#refresh").disabled = false
+  render(note)
+}
+
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.mode === state.mode) return
+  state.mode = b.dataset.mode
+  state.busy = false
+  state.token++
+  $("#refresh").disabled = false
+  render()
+  refresh()
+}))
+$("#refresh").addEventListener("click", refresh)
+document.addEventListener("visibilitychange", () => {
+  const p = state.data[state.mode]
+  if (document.visibilityState === "visible" && (!p || Date.now() / 1000 - p.ts > 120)) refresh()
+})
+setInterval(() => { if (document.visibilityState === "visible") refresh() }, AUTO_MS)
+refresh()
+</script>
+</body>
+</html>
