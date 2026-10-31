@@ -100,6 +100,9 @@ def breadcrumb(url):
         for node in nodes:
             if isinstance(node, dict) and node.get('@type') == 'BreadcrumbList':
                 paths.append(' > '.join(i.get('name', '') for i in node.get('itemListElement', [])))
+    if not paths:
+        # MOMO 偶爾回傳沒有分類的頁面，當成失敗下次重試，免得把目標商品誤判略過
+        raise RuntimeError('頁面沒有分類路徑')
     return ' | '.join(paths)
 
 
