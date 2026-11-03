@@ -184,7 +184,7 @@ function render(note) {
     for (const l of rows) {
       const i = l.indexOf("："), v = l.slice(i + 1)
       html += `<div class="wx"><div class="k">${esc(l.slice(0, i))}</div>`
-      html += `<div class="v${/下雨中|會下雨|可能下雨/.test(v) ? " rain" : ""}">${esc(v)}</div></div>`
+      html += `<div class="v${/下雨中|(?<!不太)會下雨|可能下雨/.test(v) ? " rain" : ""}">${esc(v)}</div></div>`
     }
     html += `</section>`
     const umbrella = wx.find(l => l.includes("帶傘"))
