@@ -67,6 +67,12 @@ h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
 @media (prefers-color-scheme: dark) { .tag.v { background: #33285a; color: #c8b8ff; } }
 .event .line { font-size: 14px; color: var(--muted); }
 .event .line.what { color: var(--ink); }
+.wx { padding: 10px 0; border-top: 1px solid var(--line); }
+.card h2 + .wx { border-top: 0; }
+.wx .k { color: var(--muted); font-size: 13px; }
+.wx .v { font-size: 16px; }
+.wx .v.rain { color: var(--accent); font-weight: 700; }
+.umbrella { background: var(--chip); border-radius: 10px; padding: 8px 12px; margin: 4px 0 12px; font-weight: 700; color: var(--accent); }
 .err { color: var(--warn); font-size: 14px; margin: 0 2px 12px; }
 .empty { color: var(--muted); text-align: center; padding: 28px 0; }
 footer { color: var(--muted); font-size: 12px; margin-top: 20px; line-height: 1.7; }
@@ -89,8 +95,8 @@ footer { color: var(--muted); font-size: 12px; margin-top: 20px; line-height: 1.
   <p class="meta" id="meta"></p>
   <div id="view"><div class="empty">載入中…</div></div>
   <footer>
-    國道 1 號 14–50K（含汐五／五楊高架）。資料：高公局即時事件與路段車速、警廣即時路況。<br>
-    由家裡的 NAS 即時抓取（這些資料只開放台灣網路），NAS 關機時無法更新。
+    國道 1 號 14–50K（含汐五／五楊高架）。資料：高公局即時事件與路段車速、警廣即時路況、Open-Meteo 天氣預報。<br>
+    由家裡的 NAS 即時抓取（路況資料只開放台灣網路），NAS 關機時無法更新。上下班推播與盯場時 NAS 會自動更新這頁的資料。
   </footer>
 </main>
 <script>
@@ -134,7 +140,8 @@ function render(note) {
   else if (note) { meta.textContent = note; meta.className = "meta stale" }
   else if (p) {
     const age = Math.round((Date.now() / 1000 - p.ts) / 60)
-    meta.textContent = `${hhmm(p.ts)} 更新${age >= 1 ? `（${age} 分鐘前）` : ""}`
+    const ago = age >= 90 ? `${Math.round(age / 60)} 小時前` : age >= 1 ? `${age} 分鐘前` : ""
+    meta.textContent = `${hhmm(p.ts)} NAS 更新${ago ? `（${ago}）` : ""}${age >= 5 ? "・按「查詢路況」取得最新" : ""}`
     if (age >= 5) meta.className = "meta stale"
   } else meta.textContent = ""
   if (!p) { $("#view").innerHTML = state.busy ? `<div class="empty">查詢中…</div>` : `<div class="empty">按右上角「查詢路況」取得最新路況</div>`; return }
@@ -168,6 +175,20 @@ function render(note) {
       html += `</div>`
     }
     html += `</section>`
+  }
+  // 天氣：每行是「地點／時段：內容」，最後可能有「☂️ 記得帶傘」
+  const wx = p.weather || []
+  const rows = wx.filter(l => l.includes("："))
+  if (rows.length) {
+    html += `<section class="card"><h2>天氣</h2>`
+    for (const l of rows) {
+      const i = l.indexOf("："), v = l.slice(i + 1)
+      html += `<div class="wx"><div class="k">${esc(l.slice(0, i))}</div>`
+      html += `<div class="v${/下雨中|會下雨|可能下雨/.test(v) ? " rain" : ""}">${esc(v)}</div></div>`
+    }
+    html += `</section>`
+    const umbrella = wx.find(l => l.includes("帶傘"))
+    if (umbrella) html += `<div class="umbrella">${esc(umbrella)}</div>`
   }
   if (p.errors.length) html += `<p class="err">⚠️ 抓取失敗：${esc(p.errors.join("、"))}</p>`
   $("#view").innerHTML = html
