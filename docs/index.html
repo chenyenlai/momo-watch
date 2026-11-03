@@ -2,28 +2,53 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>我的網頁</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>我的追蹤</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
 <style>
-:root { --bg:#f5f6f8; --card:#fff; --fg:#1d2330; --sub:#6b7280; --line:#e3e6eb; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#14171c; --card:#1e232b; --fg:#e8ebf0; --sub:#9aa3b2; --line:#2c333d; } }
-:root[data-theme="dark"] { --bg:#14171c; --card:#1e232b; --fg:#e8ebf0; --sub:#9aa3b2; --line:#2c333d; }
+/* 首頁：分區的大按鈕，之後加新的追蹤商品只要在「商品開賣」區多放一張 .tile */
+:root { --bg:#eef1f5; --card:#fff; --ink:#141a24; --muted:#5d6878; --line:#d5dbe4; --accent:#e07f00; --blue:#2b5fd9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0f131a; --card:#181e28; --ink:#e8edf4; --muted:#95a1b3; --line:#2a3342; --accent:#ffb23f; --blue:#7ea2ff; color-scheme:dark; } }
+:root[data-theme="dark"] { --bg:#0f131a; --card:#181e28; --ink:#e8edf4; --muted:#95a1b3; --line:#2a3342; --accent:#ffb23f; --blue:#7ea2ff; color-scheme:dark; }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif; padding:32px 16px; }
-main { max-width:480px; margin:0 auto; display:grid; gap:12px; }
-h1 { font-size:22px; margin:0 0 8px; }
-a { display:flex; align-items:center; gap:14px; padding:16px; background:var(--card); border:1px solid var(--line); border-radius:14px; color:inherit; text-decoration:none; }
-a:active { transform:scale(.99); }
-.ic { font-size:28px; }
-b { display:block; font-size:17px; }
-small { color:var(--sub); }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 "Noto Sans TC",system-ui,-apple-system,"Microsoft JhengHei",sans-serif;
+  padding:calc(24px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
+main { max-width:560px; margin:0 auto; display:grid; gap:22px; }
+h1 { font-size:24px; font-weight:900; margin:0; }
+section { display:grid; gap:10px; }
+h2 { font-size:13px; font-weight:700; letter-spacing:.1em; color:var(--muted); margin:0; }
+.tile { display:grid; grid-template-columns:52px 1fr auto; gap:14px; align-items:center; padding:14px 16px; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; color:inherit; text-decoration:none; }
+.tile:active { transform:scale(.99); }
+.ic { width:52px; height:52px; border-radius:12px; display:grid; place-items:center; font-size:28px; background:var(--bg); }
+.tile b { display:block; font-size:17px; }
+.tile small { color:var(--muted); font-size:13px; }
+.arrow { color:var(--muted); font-size:22px; }
+.goods .tile { border-left:4px solid var(--accent); }
+.life .tile { border-left:4px solid var(--blue); }
 </style>
 </head>
 <body>
 <main>
-<h1>我的網頁</h1>
-<a href="traffic.html"><span class="ic">🚗</span><span><b>國1 通勤路況</b><small>按「查詢路況」請家裡 NAS 抓即時資料</small></span></a>
-<a href="funbox.html"><span class="ic">🌀</span><span><b>FUNBOX 陀螺開賣表</b><small>MOMO 開賣行程與 FUNBOX 官網庫存</small></span></a>
+  <h1>我的追蹤</h1>
+
+  <section class="goods" aria-label="商品開賣">
+    <h2>商品開賣</h2>
+    <a class="tile" href="funbox.html">
+      <span class="ic">🌀</span>
+      <span><b>戰鬥陀螺</b><small>FUNBOX · MOMO 開賣行程、官網庫存</small></span>
+      <span class="arrow">›</span>
+    </a>
+  </section>
+
+  <section class="life" aria-label="生活">
+    <h2>生活</h2>
+    <a class="tile" href="traffic.html">
+      <span class="ic">🚗</span>
+      <span><b>國1 通勤路況</b><small>按「查詢路況」請家裡 NAS 抓即時資料</small></span>
+      <span class="arrow">›</span>
+    </a>
+  </section>
 </main>
 </body>
 </html>

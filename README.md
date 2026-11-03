@@ -2,8 +2,9 @@
 
 ## 網頁
 
+- 🏠 [首頁](https://chenyenlai.github.io/momo-watch/)
 - 🚗 [國1 通勤路況](https://chenyenlai.github.io/momo-watch/traffic.html)
-- 🌀 [FUNBOX 陀螺開賣表](https://chenyenlai.github.io/momo-watch/funbox.html)
+- 🌀 [戰鬥陀螺開賣表](https://chenyenlai.github.io/momo-watch/funbox.html)
 
 ## 說明
 
