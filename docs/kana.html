@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>50 音練習</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Sans+JP:wght@400;700&display=swap">
+<style>
+/* CY 的 50 音練習：平假名、片假名分開練；錯題和熟練度存在這台裝置的瀏覽器裡 */
+:root { --bg:#eef1f5; --card:#fff; --ink:#141a24; --muted:#5d6878; --line:#d5dbe4; --accent:#d2453b; --blue:#2b5fd9; --ok:#1f8a4c; --no:#d2453b;
+  --l0:#e9edf2; --l1:#f7d4cf; --l2:#fbe7b5; --l3:#cdeed9; --l4:#9fdcb6; --pick:#eef3ff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0f131a; --card:#181e28; --ink:#e8edf4; --muted:#95a1b3; --line:#2a3342; --accent:#ff7a6e; --blue:#7ea2ff; --ok:#5fd394; --no:#ff7a6e;
+  --l0:#222a36; --l1:#5a2a28; --l2:#5a4a1e; --l3:#1f4a33; --l4:#2a6b47; --pick:#1d2740; color-scheme:dark; } }
+:root[data-theme="dark"] { --bg:#0f131a; --card:#181e28; --ink:#e8edf4; --muted:#95a1b3; --line:#2a3342; --accent:#ff7a6e; --blue:#7ea2ff; --ok:#5fd394; --no:#ff7a6e;
+  --l0:#222a36; --l1:#5a2a28; --l2:#5a4a1e; --l3:#1f4a33; --l4:#2a6b47; --pick:#1d2740; color-scheme:dark; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 "Noto Sans TC",system-ui,-apple-system,"Microsoft JhengHei",sans-serif;
+  padding:calc(16px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
+main { max-width:560px; margin:0 auto; display:grid; gap:16px; }
+a { color:var(--blue); }
+.jp { font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif; }
+.top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.top a { text-decoration:none; font-size:15px; }
+h1 { font-size:24px; font-weight:900; margin:0; }
+h2 { font-size:13px; font-weight:700; letter-spacing:.1em; color:var(--muted); margin:0 0 8px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+.seg { display:grid; grid-template-columns:1fr 1fr; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:4px; gap:4px; }
+.seg button { border:0; background:none; font:inherit; font-size:17px; font-weight:700; padding:9px; border-radius:9px; color:var(--muted); cursor:pointer; }
+.seg button.on { background:var(--blue); color:#fff; }
+button.big { width:100%; border:0; border-radius:12px; padding:14px; font:inherit; font-size:18px; font-weight:700; background:var(--blue); color:#fff; cursor:pointer; }
+button.ghost { border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:12px; padding:11px 14px; font:inherit; font-size:16px; cursor:pointer; }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.stat { display:flex; gap:14px; flex-wrap:wrap; font-size:15px; color:var(--muted); margin:8px 0 12px; }
+.stat b { color:var(--ink); font-size:18px; }
+.bar { height:8px; border-radius:4px; background:var(--l0); overflow:hidden; display:flex; }
+.bar i { display:block; }
+/* 50 音表 */
+.grp { margin-top:10px; }
+.grp .gh { display:flex; justify-content:space-between; align-items:center; font-size:14px; color:var(--muted); margin-bottom:4px; }
+.grp .gh button { font:inherit; font-size:13px; border:1px solid var(--line); background:var(--card); color:var(--muted); border-radius:8px; padding:2px 8px; cursor:pointer; }
+.cells { display:grid; grid-template-columns:repeat(5, 1fr); gap:5px; }
+.cells.y { grid-template-columns:repeat(3, 1fr); }
+.cell { border:0; border-radius:9px; padding:5px 0 3px; background:var(--l0); color:var(--ink); cursor:pointer; text-align:center; font:inherit; }
+.cell .k { font-size:26px; line-height:1.15; display:block; }
+.cell small { font-size:12px; color:var(--muted); }
+.cell.lv1 { background:var(--l1); } .cell.lv2 { background:var(--l2); } .cell.lv3 { background:var(--l3); } .cell.lv4 { background:var(--l4); }
+.cell.lock { opacity:.35; }
+.cell.empty { visibility:hidden; }
+.legend { display:flex; gap:10px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+.legend i { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-1px; margin-right:3px; }
+/* 練習 */
+.hud { display:flex; justify-content:space-between; font-size:14px; color:var(--muted); }
+.qbox { text-align:center; padding:8px 0 4px; }
+.qk { font-size:96px; line-height:1.15; font-weight:400; }
+.qr { font-size:44px; font-weight:700; letter-spacing:.04em; }
+.qhint { font-size:15px; color:var(--muted); }
+.spk { border:0; width:92px; height:92px; border-radius:50%; background:var(--pick); font-size:42px; cursor:pointer; }
+.opts { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+.opts button { border:2px solid var(--line); background:var(--card); color:var(--ink); border-radius:12px; padding:12px 6px; font:inherit; font-size:24px; font-weight:700; cursor:pointer; min-height:66px; }
+.opts button.jpo { font-size:40px; font-weight:400; font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif; }
+.opts button.right { border-color:var(--ok); background:var(--l3); }
+.opts button.wrong { border-color:var(--no); background:var(--l1); }
+.opts button:disabled { cursor:default; }
+.fb { min-height:2.6em; margin-top:10px; font-size:16px; text-align:center; }
+.fb.ok { color:var(--ok); } .fb.no { color:var(--no); }
+.intro { text-align:center; }
+.intro .qk { font-size:110px; }
+.pair { font-size:15px; color:var(--muted); }
+.idk { margin-top:10px; width:100%; }
+.list { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.list li { display:flex; justify-content:space-between; gap:8px; font-size:15px; border-bottom:1px solid var(--line); padding:6px 0; }
+.muted { color:var(--muted); font-size:14px; }
+.hide { display:none !important; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+// ---------- 資料 ----------
+const H = 'あいうえお かきくけこ さしすせそ たちつてと なにぬねの はひふへほ まみむめも やゆよ らりるれろ わをん がぎぐげご ざじずぜぞ だぢづでど ばびぶべぼ ぱぴぷぺぽ'.split(' ');
+const RO = 'a i u e o|ka ki ku ke ko|sa shi su se so|ta chi tsu te to|na ni nu ne no|ha hi fu he ho|ma mi mu me mo|ya yu yo|ra ri ru re ro|wa wo n|ga gi gu ge go|za ji zu ze zo|da ji zu de do|ba bi bu be bo|pa pi pu pe po'.split('|');
+const GNAME = ['あ行', 'か行', 'さ行', 'た行', 'な行', 'は行', 'ま行', 'や行', 'ら行', 'わ行', 'が行', 'ざ行', 'だ行', 'ば行', 'ぱ行'];
+const YOON = [['き', 'ky'], ['し', 'sh'], ['ち', 'ch'], ['に', 'ny'], ['ひ', 'hy'], ['み', 'my'], ['り', 'ry'], ['ぎ', 'gy'], ['じ', 'j'], ['び', 'by'], ['ぴ', 'py']];
+const kata = (s) => s.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+const GROUPS = [];   // { id, name, kind: 清音/濁音/拗音, chars: [{ h, r, snd }] }
+H.forEach((row, i) => GROUPS.push({ id: 'g' + i, name: GNAME[i], kind: i < 10 ? '清音' : '濁音・半濁音',
+  chars: row.split('').map((h, j) => { const r = RO[i].split(' ')[j]; return { h, r, snd: r === 'wo' ? 'o' : r }; }) }));
+YOON.forEach(([k, p], i) => GROUPS.push({ id: 'y' + i, name: k + 'ゃ行', kind: '拗音',
+  chars: ['ゃ', 'ゅ', 'ょ'].map((s, j) => { const r = p + 'auo'[j]; return { h: k + s, r, snd: r }; }) }));
+const ALLC = GROUPS.flatMap(g => g.chars.map(c => Object.assign({ g: g.id }, c)));
+const BY = Object.fromEntries(ALLC.map(c => [c.h, c]));
+const SAMESND = (a, b) => BY[a].snd === BY[b].snd;   // じ/ぢ、ず/づ、お/を 聽起來一樣
+const showR = (c) => (c.h === 'を' ? 'wo（o）' : c.h === 'ぢ' ? 'ji（ぢ）' : c.h === 'づ' ? 'zu（づ）' : c.r);
+// 長得像、容易搞混的字（用來出干擾選項）
+const LOOK = {
+  hira: ['あおめぬ', 'ぬめね', 'ねれわ', 'るろ', 'はほけ', 'さちき', 'いりこ', 'こにた', 'うつら', 'くへ', 'しつも', 'まよほ', 'そろる', 'ゆわ', 'すむお', 'ちら', 'てと', 'ばぱ', 'じぢ', 'ずづ'],
+  kata: ['シツミ', 'ソンリノ', 'クケタ', 'ワウフ', 'スヌ', 'チテナ', 'コユロヨ', 'マアム', 'ハルヘ', 'セサヤ', 'メナノヌ', 'オホネ', 'エユ', 'カヤ', 'キモ', 'トト', 'ヒヒ', 'ラヲ'] };
+const toH = (s) => s.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+const LOOKSET = { hira: {}, kata: {} };
+['hira', 'kata'].forEach(sc => LOOK[sc].forEach(gs => { const a = gs.split('').map(toH); a.forEach(x => { LOOKSET[sc][x] = (LOOKSET[sc][x] || new Set()); a.forEach(y => y !== x && LOOKSET[sc][x].add(y)); }); }));
+
+// ---------- 儲存（這台裝置的瀏覽器） ----------
+const KEY = 'cy-kana-v1';
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+if (!S || !S.hira) S = { script: 'hira', hira: { c: {}, open: ['g0', 'g1'], log: [] }, kata: { c: {}, open: ['g0', 'g1'], log: [] } };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const SC = () => S[S.script];
+const st = (h) => SC().c[h] || (SC().c[h] = { box: 0, n: 0, ok: 0, bad: 0, fix: 0, last: 0 });   // fix>0：錯過還沒克服（要連對 2 次）
+const lv = (h) => { const s = SC().c[h]; if (!s || !s.n) return 0; if (s.fix > 0) return 1; return s.box >= 4 ? 4 : s.box >= 2 ? 3 : 2; };
+const K = (h) => (S.script === 'kata' ? kata(h) : h);
+const isOpen = (gid) => SC().open.includes(gid);
+const R = { pick: a => a[Math.floor(Math.random() * a.length)], shuffle: a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; } };
+
+// 開放的字都練到「學習中」以上（box ≥ 2）就自動開下一行
+function autoUnlock() {
+  const sc = SC(); let added = null;
+  const open = ALLC.filter(c => isOpen(c.g));
+  if (open.every(c => (sc.c[c.h] || {}).box >= 2)) {
+    const nx = GROUPS.find(g => !isOpen(g.id));
+    if (nx) { sc.open.push(nx.id); added = nx; save(); }
+  }
+  return added;
+}
+
+// ---------- 聲音 ----------
+let audio = null;
+function play(c) { try { if (audio) audio.pause(); audio = new Audio('kana/' + c.snd + '.mp3'); audio.play().catch(() => {}); } catch (e) {} }
+
+// ---------- 畫面 ----------
+const app = document.getElementById('app');
+const esc = (s) => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+window.addEventListener('hashchange', route);
+function route() {
+  const h = location.hash.slice(1);
+  if (h === 'practice') practice('round'); else if (h === 'review') practice('review'); else if (h === 'test') practice('test');
+  else if (h === 'stats') stats(); else home();
+  window.scrollTo(0, 0);
+}
+function seg() {
+  return '<div class="seg"><button data-s="hira" class="' + (S.script === 'hira' ? 'on' : '') + '">ひらがな 平假名</button><button data-s="kata" class="' + (S.script === 'kata' ? 'on' : '') + '">カタカナ 片假名</button></div>';
+}
+function bindSeg(after) { app.querySelectorAll('.seg button').forEach(b => b.onclick = () => { S.script = b.dataset.s; save(); after(); }); }
+
+function home() {
+  const sc = SC(), open = ALLC.filter(c => isOpen(c.g));
+  const n = ALLC.length, cnt = [0, 0, 0, 0, 0]; ALLC.forEach(c => cnt[lv(c.h)]++);
+  const fix = ALLC.filter(c => (sc.c[c.h] || {}).fix > 0);
+  const today = new Date().toDateString(), todayN = sc.log.filter(x => new Date(x.t).toDateString() === today).length;
+  let h = '<div class="top"><a href="./">← 首頁</a><a href="#stats">📊 紀錄</a></div><h1>50 音練習</h1>' + seg() +
+    '<div class="card"><h2>今天</h2><div class="stat"><span>已開放 <b>' + open.length + '</b> 字</span><span>熟練 <b>' + cnt[4] + '</b> / ' + n + '</span><span>今天答了 <b>' + todayN + '</b> 題</span></div>' +
+    '<div class="bar">' + [4, 3, 2, 1].map(l => '<i style="width:' + cnt[l] / n * 100 + '%;background:var(--l' + l + ')"></i>').join('') + '</div>' +
+    '<div style="display:grid;gap:10px;margin-top:14px"><button class="big" onclick="location.hash=\'practice\'">開始練習（10 題）▶</button>' +
+    '<div class="row2"><button class="ghost" ' + (fix.length ? '' : 'disabled style="opacity:.5"') + ' onclick="location.hash=\'review\'">📒 錯題複習（' + fix.length + '）</button>' +
+    '<button class="ghost" onclick="location.hash=\'test\'">⚡ 快速檢測</button></div>' +
+    (sc.log.length ? '' : '<p class="muted" style="margin:0">已經會一些了？先做「快速檢測」，會的字直接跳過；完全沒學過就直接「開始練習」，從 あ行、か行 開始。</p>') + '</div></div>' +
+    '<div class="card"><h2>50 音表（點一下聽發音）</h2><div class="legend"><span><i style="background:var(--l0)"></i>沒練過</span><span><i style="background:var(--l1)"></i>錯過、還沒克服</span><span><i style="background:var(--l2)"></i>學習中</span><span><i style="background:var(--l3)"></i>快會了</span><span><i style="background:var(--l4)"></i>熟練</span></div>';
+  let kind = '';
+  GROUPS.forEach(g => {
+    if (g.kind !== kind) { kind = g.kind; h += '<h2 style="margin-top:16px">' + kind + '</h2>'; }
+    const cells = g.id === 'g7' ? [g.chars[0], null, g.chars[1], null, g.chars[2]] : g.id === 'g9' ? [g.chars[0], null, null, g.chars[1], g.chars[2]] : g.chars;
+    h += '<div class="grp"><div class="gh"><span class="jp">' + esc(K(g.name.replace('行', ''))) + ' 行</span>' +
+      (isOpen(g.id) ? '' : '<button data-open="' + g.id + '">🔒 我想先練這行</button>') + '</div><div class="cells' + (g.id[0] === 'y' ? ' y' : '') + '">' +
+      cells.map(c => c ? '<button class="cell lv' + lv(c.h) + (isOpen(g.id) ? '' : ' lock') + '" data-h="' + c.h + '"><span class="k jp">' + K(c.h) + '</span><small>' + showR(c) + '</small></button>' : '<span class="cell empty"></span>').join('') + '</div></div>';
+  });
+  h += '<p class="muted">紀錄存在這台裝置的瀏覽器裡（手機和電腦各自分開）。</p></div>';
+  app.innerHTML = h;
+  bindSeg(home);
+  app.querySelectorAll('.cell[data-h]').forEach(b => b.onclick = () => play(BY[b.dataset.h]));
+  app.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { SC().open.push(b.dataset.open); save(); home(); });
+}
+
+// ---------- 出題 ----------
+// 題型：see 看字選讀音、hear 聽音選字、romaji 看拼音選字
+function distractK(c, pool) {
+  const look = [...(LOOKSET[S.script][c.h] || [])].filter(x => BY[x] && !SAMESND(x, c.h));
+  const near = pool.filter(x => x.h !== c.h && !SAMESND(x.h, c.h) && (x.r[0] === c.r[0] || x.r.slice(-1) === c.r.slice(-1))).map(x => x.h);
+  const rest = pool.filter(x => x.h !== c.h && !SAMESND(x.h, c.h)).map(x => x.h);
+  const out = [];
+  for (const x of [...R.shuffle(look), ...R.shuffle(near), ...R.shuffle(rest), ...R.shuffle(ALLC.map(y => y.h))]) {
+    if (out.length >= 3) break;
+    if (x !== c.h && !SAMESND(x, c.h) && !out.some(y => SAMESND(x, y))) out.push(x);
+  }
+  return out;
+}
+function makeQ(c, type, pool) {
+  const ds = distractK(c, pool).map(h => BY[h]);
+  const opts = R.shuffle([c].concat(ds));
+  return { c, type, opts };
+}
+function buildRound(mode) {
+  const sc = SC();
+  if (mode === 'test') return ALLC.filter(c => c.g[0] === 'g').map(c => ({ c, type: 'see', test: true }));
+  const open = ALLC.filter(c => isOpen(c.g));
+  const fix = open.filter(c => (sc.c[c.h] || {}).fix > 0);
+  if (mode === 'review') return R.shuffle(fix).slice(0, 10).map(c => ({ c, type: R.pick(['see', 'hear']) }));
+  const out = [], used = new Set();
+  const add = (c, type, intro) => { if (used.has(c.h) || out.length >= 10) return; used.add(c.h); out.push({ c, type: type || R.pick(['see', 'see', 'hear', 'hear', 'romaji']), intro }); };
+  R.shuffle(fix).slice(0, 3).forEach(c => add(c));
+  const seenN = open.filter(c => (sc.c[c.h] || {}).n).length;
+  open.filter(c => !(sc.c[c.h] || {}).n).slice(0, seenN < 5 ? 5 : 3).forEach(c => add(c, 'see', true));   // 新字：先看介紹卡（第一次一整行 5 個）
+  // 其他：熟練度低的、比較久沒練的多出
+  const w = (c) => { const s = sc.c[c.h]; if (!s || !s.n) return 0; return (5 - Math.min(5, s.box)) * 2 + Math.min(4, (Date.now() - s.last) / 864e5) + Math.random() * 2; };
+  open.filter(c => (sc.c[c.h] || {}).n).sort((a, b) => w(b) - w(a)).forEach(c => add(c));
+  // 字不夠 10 題：同一個字換題型再考
+  const first = R.shuffle(out.slice()), TYPES = ['hear', 'romaji', 'see'];
+  for (let k = 0; out.length < 10 && first.length; k++) { const q = first[k % first.length]; out.push({ c: q.c, type: TYPES[Math.floor(k / first.length) % 3] }); }
+  return out;
+}
+
+function practice(mode) {
+  const qs = buildRound(mode);
+  if (!qs.length) { location.hash = ''; return; }
+  const title = mode === 'test' ? '⚡ 快速檢測' : mode === 'review' ? '📒 錯題複習' : '練習';
+  let i = 0, score = 0, wrongs = [];
+  const pool = ALLC.filter(c => isOpen(c.g));
+  function header() {
+    return '<div class="top"><a href="#">← 回 50 音</a><span class="muted">' + (S.script === 'hira' ? '平假名' : '片假名') + '・' + title + '</span></div>' +
+      '<div class="hud"><span>' + (i + 1) + ' / ' + qs.length + '</span><span>答對 ' + score + '</span></div><div class="bar"><i style="width:' + i / qs.length * 100 + '%;background:var(--blue)"></i></div>';
+  }
+  function show() {
+    if (i >= qs.length) return end();
+    const q0 = qs[i];
+    if (q0.intro) {
+      const c = q0.c;
+      app.innerHTML = header() + '<div class="card intro"><p class="muted" style="margin:0">新的字 ✨</p><div class="qk jp">' + K(c.h) + '</div><div class="qr">' + showR(c) + '</div>' +
+        '<p class="pair">' + (S.script === 'hira' ? '片假名寫成 <span class="jp">' + kata(c.h) + '</span>' : '平假名寫成 <span class="jp">' + c.h + '</span>') + '</p>' +
+        '<div style="display:flex;gap:10px;justify-content:center"><button class="ghost" id="ag">🔊 再聽一次</button><button class="big" style="width:auto;padding:12px 26px" id="go">記住了 →</button></div></div>';
+      play(c); app.querySelector('#ag').onclick = () => play(c);
+      app.querySelector('#go').onclick = () => { q0.intro = false; show(); };
+      return;
+    }
+    const q = makeQ(q0.c, q0.type, pool), c = q.c, t0 = Date.now();
+    let body = '';
+    if (q.type === 'see') body = '<div class="qbox"><div class="qk jp">' + K(c.h) + '</div><div class="qhint">怎麼念？</div></div>';
+    else if (q.type === 'hear') body = '<div class="qbox"><button class="spk" id="spk">🔊</button><div class="qhint" style="margin-top:6px">聽一聽，是哪一個字？</div></div>';
+    else body = '<div class="qbox"><div class="qr">' + showR(c) + '</div><div class="qhint">是哪一個字？</div></div>';
+    const lbl = (o) => (q.type === 'see' ? showR(o) : K(o.h));
+    app.innerHTML = header() + '<div class="card">' + body + '<div class="opts">' + q.opts.map((o, k) => '<button data-k="' + k + '" class="' + (q.type === 'see' ? '' : 'jpo') + '">' + esc(lbl(o)) + '</button>').join('') + '</div>' +
+      (q0.test ? '<button class="ghost idk" id="idk">不知道</button>' : '') + '<div class="fb" id="fb"></div></div>';
+    if (q.type === 'hear') { play(c); app.querySelector('#spk').onclick = () => play(c); }
+    const pick = (k) => {
+      const o = k == null ? null : q.opts[k], ok = !!o && o.h === c.h, ms = Date.now() - t0;
+      app.querySelectorAll('.opts button').forEach((b, j) => { b.disabled = true; if (q.opts[j].h === c.h) b.classList.add('right'); else if (j === k) b.classList.add('wrong'); });
+      const idk = app.querySelector('#idk'); if (idk) idk.disabled = true;
+      record(c, q.type, o, ok, ms, mode);
+      if (ok) score++; else wrongs.push({ c, o });
+      const fb = app.querySelector('#fb');
+      if (q.type !== 'hear' || !ok) play(c);
+      if (ok) { fb.className = 'fb ok'; fb.innerHTML = '⭕ <span class="jp">' + K(c.h) + '</span> = ' + showR(c) + (ms > 6000 && !q0.test ? '<br><span class="muted">對了，但想比較久，之後會再出</span>' : ''); setTimeout(() => { i++; show(); }, q0.test ? 450 : 1000); }
+      else {
+        fb.className = 'fb no';
+        fb.innerHTML = '❌ 答案是 <b class="jp">' + K(c.h) + '</b>（' + showR(c) + '）' + (o ? '<br>你選的 <span class="jp">' + K(o.h) + '</span> 是 ' + showR(o) : '') +
+          '<div style="display:flex;gap:10px;justify-content:center;margin-top:10px">' + (o ? '<button class="ghost" id="hearO">🔊 聽 <span class="jp">' + K(o.h) + '</span></button>' : '') + '<button class="big" style="width:auto;padding:10px 24px" id="nx">下一題 →</button></div>';
+        if (o) app.querySelector('#hearO').onclick = () => play(o);
+        app.querySelector('#nx').onclick = () => { i++; show(); };
+      }
+    };
+    app.querySelectorAll('.opts button').forEach(b => b.onclick = () => pick(+b.dataset.k));
+    if (q0.test) app.querySelector('#idk').onclick = () => pick(null);
+  }
+  function end() {
+    let extra = '';
+    if (mode === 'test') {
+      // 檢測：一行裡全部答對的行直接開放；第一個沒全對的行也開放，從那裡開始練
+      const sc = SC();
+      GROUPS.filter(g => g.id[0] === 'g').forEach(g => { if (g.chars.every(c => (sc.c[c.h] || {}).box >= 3) && !isOpen(g.id)) sc.open.push(g.id); });
+      const firstWeak = GROUPS.find(g => g.id[0] === 'g' && !g.chars.every(c => (sc.c[c.h] || {}).box >= 3));
+      if (firstWeak && !isOpen(firstWeak.id)) sc.open.push(firstWeak.id);
+      save();
+      extra = '<p>會的字已經標成「熟練」，不會的字會從練習裡慢慢出。</p>';
+    }
+    const nx = mode === 'test' ? null : autoUnlock();
+    const conf = wrongs.filter(w => w.o).map(w => '<li><span class="jp">' + K(w.c.h) + '（' + showR(w.c) + '）</span><span class="muted">選成 <span class="jp">' + K(w.o.h) + '（' + showR(w.o) + '）</span></span></li>').join('');
+    app.innerHTML = '<div class="top"><a href="#">← 回 50 音</a></div><div class="card" style="text-align:center"><div style="font-size:48px">' + (score >= qs.length * 0.8 ? '🎉' : '💪') + '</div><h1>答對 ' + score + ' / ' + qs.length + '</h1>' + extra +
+      (nx ? '<p style="font-size:18px">🔓 開放新的一行：<b class="jp">' + K(nx.name.replace('行', '')) + ' 行</b></p>' : '') +
+      (conf ? '<ul class="list" style="text-align:left;margin-top:10px">' + conf + '</ul>' : '') +
+      '<div class="row2" style="margin-top:14px"><button class="big" id="again">再一回合 ↺</button><button class="ghost" onclick="location.hash=\'\'">回 50 音表</button></div></div>';
+    app.querySelector('#again').onclick = () => practice(mode === 'test' ? 'round' : mode);
+  }
+  show();
+}
+
+function record(c, type, o, ok, ms, mode) {
+  const s = st(c.h), sc = SC();
+  s.n++; s.last = Date.now();
+  // 檢測：答對又快 → 直接算熟練；不會的字當成沒學過（之後練習會先出介紹卡）
+  if (mode === 'test') { if (ok && ms < 5000) { s.box = Math.max(s.box, 4); s.ok++; } else { s.n--; s.box = 0; } }
+  else if (ok) { s.ok++; if (ms < 6000) s.box = Math.min(5, s.box + 1); if (s.fix > 0) s.fix--; }
+  else { s.bad++; s.box = 0; s.fix = 2; }
+  sc.log.push({ t: Date.now(), h: c.h, type, a: o ? o.h : null, ok, ms, m: mode });
+  if (sc.log.length > 3000) sc.log = sc.log.slice(-3000);
+  save();
+}
+
+function stats() {
+  const sc = SC(), log = sc.log;
+  const days = {}; log.forEach(x => { const d = new Date(x.t).toLocaleDateString('zh-TW'); const v = days[d] = days[d] || { n: 0, ok: 0 }; v.n++; if (x.ok) v.ok++; });
+  const conf = {}; log.filter(x => !x.ok && x.a).forEach(x => { const k = x.h + '→' + x.a; conf[k] = (conf[k] || 0) + 1; });
+  const weak = ALLC.map(c => ({ c, s: sc.c[c.h] })).filter(x => x.s && x.s.bad).sort((a, b) => b.s.bad / b.s.n - a.s.bad / a.s.n).slice(0, 12);
+  const typ = { see: '看字選讀音', hear: '聽音選字', romaji: '看拼音選字' }, tt = {};
+  log.forEach(x => { const v = tt[x.type] = tt[x.type] || { n: 0, ok: 0, ms: 0 }; v.n++; if (x.ok) v.ok++; v.ms += x.ms; });
+  let h = '<div class="top"><a href="#">← 回 50 音</a></div><h1>📊 紀錄</h1>' + seg();
+  h += '<div class="card"><h2>每天</h2><ul class="list">' + (Object.entries(days).reverse().slice(0, 14).map(([d, v]) => '<li><span>' + d + '</span><span>' + v.n + ' 題・答對 ' + Math.round(v.ok / v.n * 100) + '%</span></li>').join('') || '<li>還沒有紀錄</li>') + '</ul></div>';
+  h += '<div class="card"><h2>題型</h2><ul class="list">' + (Object.entries(tt).map(([k, v]) => '<li><span>' + typ[k] + '</span><span>' + Math.round(v.ok / v.n * 100) + '%・平均 ' + (v.ms / v.n / 1000).toFixed(1) + ' 秒</span></li>').join('') || '<li>還沒有紀錄</li>') + '</ul></div>';
+  h += '<div class="card"><h2>最常錯的字</h2><ul class="list">' + (weak.map(x => '<li><span class="jp" style="font-size:20px">' + K(x.c.h) + ' <small class="muted">' + showR(x.c) + '</small></span><span>錯 ' + x.s.bad + ' / ' + x.s.n + (x.s.fix > 0 ? '・還沒克服' : '・已克服') + '</span></li>').join('') || '<li>沒有錯題 👍</li>') + '</ul></div>';
+  h += '<div class="card"><h2>常搞混</h2><ul class="list">' + (Object.entries(conf).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, n]) => { const [a, b] = k.split('→');
+    return '<li><span class="jp" style="font-size:20px">' + K(a) + ' → ' + K(b) + '</span><span class="muted">' + showR(BY[a]) + ' 選成 ' + showR(BY[b]) + '・' + n + ' 次</span></li>'; }).join('') || '<li>還沒有</li>') + '</ul></div>';
+  h += '<div class="card"><h2>重新開始</h2><p class="muted" style="margin-top:0">只清掉' + (S.script === 'hira' ? '平假名' : '片假名') + '的紀錄。</p><button class="ghost" id="rst">🧹 清除' + (S.script === 'hira' ? '平假名' : '片假名') + '紀錄</button></div>';
+  app.innerHTML = h;
+  bindSeg(stats);
+  app.querySelector('#rst').onclick = () => { if (confirm('確定要清除' + (S.script === 'hira' ? '平假名' : '片假名') + '的所有紀錄嗎？')) { S[S.script] = { c: {}, open: ['g0', 'g1'], log: [] }; save(); stats(); } };
+}
+route();
+</script>
+</body>
+</html>
