@@ -127,7 +127,7 @@ const LOOKSET = { hira: {}, kata: {} };
 
 // ---------- 儲存（這台裝置的瀏覽器） ----------
 // ---------- 雲端同步（Google 試算表 + Apps Script，見 apps-script/kana-sync.gs）----------
-const SYNC_URL = '';                      // Apps Script 部署網址；空白就只存在這台裝置
+const SYNC_URL = 'https://script.google.com/macros/s/AKfycby4oFDgD33QH4tcn_Vn9bIXRYWGGTQZ6vh_QRUtiaCiwhsle3L3Eb0ByBDtt6zWqFUzGw/exec';                      // Apps Script 部署網址；空白就只存在這台裝置
 const SYNC_KEY = 'V0fNiZTXgSPpvJHi';
 function evArr(e, sc) { return [e.i, e.t, sc, e.h, e.type, e.a, e.ok, e.ms, e.m]; }
 function evObj(v) { return { i: v[0], t: v[1], h: v[3], type: v[4], a: v[5] || null, ok: !!v[6], ms: v[7], m: v[8] }; }
