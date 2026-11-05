@@ -126,10 +126,20 @@ const LOOKSET = { hira: {}, kata: {} };
 ['hira', 'kata'].forEach(sc => LOOK[sc].forEach(gs => { const a = gs.split('').map(toH); a.forEach(x => { LOOKSET[sc][x] = (LOOKSET[sc][x] || new Set()); a.forEach(y => y !== x && LOOKSET[sc][x].add(y)); }); }));
 
 // ---------- 儲存（這台裝置的瀏覽器） ----------
+// ---------- 雲端同步（Google 試算表 + Apps Script，見 apps-script/kana-sync.gs）----------
+const SYNC_URL = '';                      // Apps Script 部署網址；空白就只存在這台裝置
+const SYNC_KEY = 'V0fNiZTXgSPpvJHi';
+function evArr(e, sc) { return [e.i, e.t, sc, e.h, e.type, e.a, e.ok, e.ms, e.m]; }
+function evObj(v) { return { i: v[0], t: v[1], h: v[3], type: v[4], a: v[5] || null, ok: !!v[6], ms: v[7], m: v[8] }; }
 const KEY = 'cy-kana-v1';
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !S.hira) S = { script: 'hira', hira: { c: {}, open: ['g0', 'g1'], log: [] }, kata: { c: {}, open: ['g0', 'g1'], log: [] } };
+if (!S.dev) S.dev = Math.random().toString(36).slice(2, 7);
+if (!S.q) S.q = [];          // 還沒上傳到雲端的作答
+if (!S.srvN) S.srvN = 0;     // 已經從雲端拿到第幾筆
+['hira', 'kata'].forEach(sc => { const x = S[sc]; if (!x.reset) x.reset = 0;
+  x.log.forEach(e => { if (!e.i) { e.i = e.t.toString(36) + '-' + S.dev; S.q.push(evArr(e, sc)); } }); });   // 舊紀錄補 id、排進上傳
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 const SC = () => S[S.script];
 const st = (h) => SC().c[h] || (SC().c[h] = { box: 0, n: 0, ok: 0, bad: 0, fix: 0, last: 0 });   // fix>0：錯過還沒克服（要連對 2 次）
@@ -179,7 +189,7 @@ function home() {
   const n = ALLC.length, cnt = [0, 0, 0, 0, 0]; ALLC.forEach(c => cnt[lv(c.h)]++);
   const fix = ALLC.filter(c => (sc.c[c.h] || {}).fix > 0);
   const today = new Date().toDateString(), todayN = sc.log.filter(x => new Date(x.t).toDateString() === today).length;
-  let h = '<div class="top"><a href="./">← 首頁</a><a href="#stats">📊 紀錄</a></div><h1>50 音練習</h1>' + seg() +
+  let h = '<div class="top"><a href="./">← 首頁</a><a href="#stats">📊 紀錄</a></div><h1>50 音練習</h1><p class="muted" id="sync" style="margin:-8px 0 0">' + esc(syncMsg) + '</p>' + seg() +
     '<div class="card"><h2>今天</h2><div class="stat"><span>已開放 <b>' + open.length + '</b> 字</span><span>熟練 <b>' + cnt[4] + '</b> / ' + n + '</span><span>今天答了 <b>' + todayN + '</b> 題</span></div>' +
     '<div class="bar">' + [4, 3, 2, 1].map(l => '<i style="width:' + cnt[l] / n * 100 + '%;background:var(--l' + l + ')"></i>').join('') + '</div>' +
     '<div style="display:grid;gap:10px;margin-top:14px"><button class="big" onclick="location.hash=\'practice\'">開始練習（10 題）▶</button>' +
@@ -195,11 +205,11 @@ function home() {
       (isOpen(g.id) ? '' : '<button data-open="' + g.id + '">🔒 我想先練這行</button>') + '</div><div class="cells' + (g.id[0] === 'y' ? ' y' : '') + '">' +
       cells.map(c => c ? '<button class="cell lv' + lv(c.h) + (isOpen(g.id) ? '' : ' lock') + '" data-h="' + c.h + '"><span class="k jp">' + K(c.h) + '</span><small>' + showR(c) + '</small></button>' : '<span class="cell empty"></span>').join('') + '</div></div>';
   });
-  h += '<p class="muted">紀錄存在這台裝置的瀏覽器裡（手機和電腦各自分開）。</p></div>';
+  h += '<p class="muted">' + (SYNC_URL ? '紀錄會同步到 Google 試算表，手機和電腦共用。' : '紀錄存在這台裝置的瀏覽器裡（手機和電腦各自分開）。') + '</p></div>';
   app.innerHTML = h;
   bindSeg(home);
   app.querySelectorAll('.cell[data-h]').forEach(b => b.onclick = () => { const c = BY[b.dataset.h]; play(c); sheet(c); });
-  app.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { SC().open.push(b.dataset.open); save(); home(); });
+  app.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { SC().open.push(b.dataset.open); save(); home(); sync(); });
 }
 
 // ---------- 出題 ----------
@@ -309,21 +319,54 @@ function practice(mode) {
       (conf ? '<ul class="list" style="text-align:left;margin-top:10px">' + conf + '</ul>' : '') +
       '<div class="row2" style="margin-top:14px"><button class="big" id="again">再一回合 ↺</button><button class="ghost" onclick="location.hash=\'\'">回 50 音表</button></div></div>';
     app.querySelector('#again').onclick = () => practice(mode === 'test' ? 'round' : mode);
+    sync();
   }
   show();
 }
 
-function record(c, type, o, ok, ms, mode) {
-  const s = st(c.h), sc = SC();
-  s.n++; s.last = Date.now();
+// 一題作答怎麼改變這個字的熟練度（同一份規則也用來從雲端紀錄重算）
+function applyEv(sc, e) {
+  const s = sc.c[e.h] || (sc.c[e.h] = { box: 0, n: 0, ok: 0, bad: 0, fix: 0, last: 0 });
+  s.n++; s.last = e.t;
   // 檢測：答對又快 → 直接算熟練；不會的字當成沒學過（之後練習會先出介紹卡）
-  if (mode === 'test') { if (ok && ms < 5000) { s.box = Math.max(s.box, 4); s.ok++; } else { s.n--; s.box = 0; } }
-  else if (ok) { s.ok++; if (ms < 6000) s.box = Math.min(5, s.box + 1); if (s.fix > 0) s.fix--; }
+  if (e.m === 'test') { if (e.ok && e.ms < 5000) { s.box = Math.max(s.box, 4); s.ok++; } else { s.n--; s.box = 0; } }
+  else if (e.ok) { s.ok++; if (e.ms < 6000) s.box = Math.min(5, s.box + 1); if (s.fix > 0) s.fix--; }
   else { s.bad++; s.box = 0; s.fix = 2; }
-  sc.log.push({ t: Date.now(), h: c.h, type, a: o ? o.h : null, ok, ms, m: mode });
-  if (sc.log.length > 3000) sc.log = sc.log.slice(-3000);
+}
+function rebuild(sc) { sc.log.sort((a, b) => a.t - b.t); sc.c = {}; sc.log.forEach(e => applyEv(sc, e)); }
+function record(c, type, o, ok, ms, mode) {
+  const sc = SC(), t = Date.now(), e = { i: t.toString(36) + '-' + S.dev, t, h: c.h, type, a: o ? o.h : null, ok, ms, m: mode };
+  applyEv(sc, e); sc.log.push(e); S.q.push(evArr(e, S.script));
+  if (sc.log.length > 20000) sc.log = sc.log.slice(-20000);
   save();
 }
+// 上傳還沒送的作答、拿回別台裝置的作答，合併後重算
+let syncMsg = SYNC_URL ? '' : '紀錄只存在這台裝置', syncing = null;
+function sync() {
+  if (!SYNC_URL) return Promise.resolve(false);
+  if (syncing) return syncing;
+  const sent = S.q.slice();
+  const body = { k: SYNC_KEY, since: S.srvN, ev: sent, open: { hira: S.hira.open, kata: S.kata.open }, reset: { hira: S.hira.reset, kata: S.kata.reset } };
+  syncing = fetch(SYNC_URL, { method: 'POST', body: JSON.stringify(body) }).then(r => r.json()).then(d => {
+    if (!d.ok) throw new Error(d.err);
+    const ids = new Set(sent.map(v => v[0])); S.q = S.q.filter(v => !ids.has(v[0]));
+    let changed = false;
+    ['hira', 'kata'].forEach(k => {
+      const sc = S[k], rr = d.cfg.reset[k] || 0;
+      if (rr > sc.reset) { S[k] = { c: {}, open: ['g0', 'g1'], log: [], reset: rr }; changed = true; }   // 別台按了「清除紀錄」
+      const x = S[k], have = new Set(x.log.map(e => e.i)); let add = false;
+      d.ev.filter(v => v[2] === k && v[1] >= x.reset && !have.has(v[0])).forEach(v => { x.log.push(evObj(v)); add = true; });
+      if (add) { rebuild(x); changed = true; }
+      const op = [...new Set(x.open.concat(d.cfg.open[k] || []))]; if (op.length !== x.open.length) { x.open = op; changed = true; }
+    });
+    S.srvN = d.n; save();
+    syncMsg = '☁️ 已同步 ' + new Date().toTimeString().slice(0, 5) + (S.q.length ? '，還有 ' + S.q.length + ' 題待上傳' : '');
+    return changed;
+  }).catch(() => { syncMsg = '⚠️ 暫時連不到雲端' + (S.q.length ? '，' + S.q.length + ' 題先存在這台，之後會補傳' : ''); return false; })
+    .finally(() => { syncing = null; const st = document.getElementById('sync'); if (st) st.textContent = syncMsg; });
+  return syncing;
+}
+function syncAndRefresh() { sync().then(ch => { const h = location.hash.slice(1); if (ch && (h === '' || h === 'stats')) route(); }); }
 
 function stats() {
   const sc = SC(), log = sc.log;
@@ -341,9 +384,11 @@ function stats() {
   h += '<div class="card"><h2>重新開始</h2><p class="muted" style="margin-top:0">只清掉' + (S.script === 'hira' ? '平假名' : '片假名') + '的紀錄。</p><button class="ghost" id="rst">🧹 清除' + (S.script === 'hira' ? '平假名' : '片假名') + '紀錄</button></div>';
   app.innerHTML = h;
   bindSeg(stats);
-  app.querySelector('#rst').onclick = () => { if (confirm('確定要清除' + (S.script === 'hira' ? '平假名' : '片假名') + '的所有紀錄嗎？')) { S[S.script] = { c: {}, open: ['g0', 'g1'], log: [] }; save(); stats(); } };
+  app.querySelector('#rst').onclick = () => { if (confirm('確定要清除' + (S.script === 'hira' ? '平假名' : '片假名') + '的所有紀錄嗎？')) { S.q = S.q.filter(v => v[2] !== S.script); S[S.script] = { c: {}, open: ['g0', 'g1'], log: [], reset: Date.now() }; save(); stats(); sync(); } };
 }
 route();
+syncAndRefresh();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncAndRefresh(); });
 </script>
 </body>
 </html>
