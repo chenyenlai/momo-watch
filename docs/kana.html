@@ -107,7 +107,7 @@ const SAMESND = (a, b) => BY[a].snd === BY[b].snd;   // じ/ぢ、ず/づ、お/
 function memoHTML(c, brief) {
   const M = (window.KANA_MEMO || {})[S.script] || {}, J = (x) => '<span class="jp">' + esc(K(x)) + '</span>';
   const base = (h) => { const m = M[K(h)]; if (!m) return ''; return brief ? m[1] :
-    '<div class="src">字源<b class="jp">' + m[0] + '</b></div>' + m[1] + '<div class="ex">例：<span class="jp">' + esc(m[2]) + '</span></div>'; };
+    '<div class="src">字源<b class="jp">' + m[0] + '</b>' + (m[3] ? '　共 ' + m[3] + ' 畫' : '') + '</div>' + m[1] + '<div class="ex">例：<span class="jp">' + esc(m[2]) + '</span></div>'; };
   let h = '';
   if (c.h.length === 2) { const b = BY[c.h[0]]; h = J(c.h[0]) + '（' + showR(b) + '）後面加一個小小的 ' + J(c.h[1]) + '，兩個合成一拍，念 ' + showR(c) + '。'; }
   else if (/^g1[0-4]$/.test(c.g)) {
