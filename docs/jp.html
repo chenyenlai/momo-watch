@@ -174,7 +174,7 @@ function loadData(d) {
   });
 }
 function breakdown(it) {   // 句子拆成詞卡，每塊下面寫意思；有說明的再加 💡
-  return '<div class="brk">' + it.chips.map(c => '<span><b class="jp">' + ruby(c) + '</b><small>' + esc(GL[plain(c)] || '') + '</small></span>').join('') + '</div>' + (it.note ? '<div class="note">💡 ' + esc(it.note) + '</div>' : '');
+  return '<div class="brk">' + it.chips.map(c => '<span><b class="jp">' + ruby(c) + '</b><small>' + esc((it.gl || {})[plain(c)] || GL[plain(c)] || '') + '</small></span>').join('') + '</div>' + (it.note ? '<div class="note">💡 ' + esc(it.note) + '</div>' : '');
 }
 const hasKanji = (s) => /[一-鿿]/.test(s);
 function typesOf(it) {
