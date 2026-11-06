@@ -1,5 +1,5 @@
 /**
- * 50 音練習的雲端紀錄（Google 試算表 + Apps Script）
+ * 50 音練習＋日文課的雲端紀錄（Google 試算表 + Apps Script）　第 2 版：加日文課
  * 用法：在試算表「擴充功能 → Apps Script」整段貼上，部署成網頁應用程式（執行身分：我；誰可以存取：所有人）。
  *
  * 試算表會有兩個分頁：
@@ -15,7 +15,9 @@ const KEY = 'V0fNiZTXgSPpvJHi';
 const LOG = '作答紀錄', CFG = '設定';
 const HEAD = ['id', '時間', '平/片', '字', '題型', '選的字', '對錯', '秒數', '模式', 'key', '選的 key'];
 const TYPE = { see: '看字選音', hear: '聽音選字', romaji: '看拼音選字' };
-const MODE = { round: '練習', review: '錯題複習', test: '快速檢測' };
+const MODE = { round: '練習', review: '錯題複習', test: '快速檢測', lesson: '課程練習', mix: '綜合複習', fix: '錯題本', pass: '通過測驗' };
+const TYPE2 = { pic: '看圖選字', read: '看字選讀音', mean: '看字選意思', fill: '填空', order: '排句子', listen: '聽句子', clock: '時鐘', ko: 'これそれあれ' };
+const SC = { hira: '平', kata: '片', jp: '日' };
 
 function sheet_(name, head) {
   const ss = SpreadsheetApp.getActive();
@@ -24,12 +26,15 @@ function sheet_(name, head) {
   return sh;
 }
 const kata_ = (s) => s ? s.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60)) : '';
+const typeName_ = (t) => TYPE[t] || TYPE2[t] || t, typeKey_ = (n) => Object.keys(TYPE).find(k => TYPE[k] === n) || Object.keys(TYPE2).find(k => TYPE2[k] === n) || n;
 const out_ = (o) => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 
 function cfg_() {
   const v = sheet_(CFG).getRange('A1').getValue();
-  try { const c = JSON.parse(v); if (c && c.open) return c; } catch (e) {}
-  return { open: { hira: ['g0', 'g1'], kata: ['g0', 'g1'] }, reset: { hira: 0, kata: 0 } };
+  let c = null; try { c = JSON.parse(v); } catch (e) {}
+  if (!c || !c.open) c = { open: { hira: ['g0', 'g1'], kata: ['g0', 'g1'] }, reset: { hira: 0, kata: 0 } };
+  if (!c.jp) c.jp = { pass: {}, reset: 0 };   // 日文課：通過測驗的課、清除時間
+  return c;
 }
 
 function read_(since) {
@@ -37,10 +42,10 @@ function read_(since) {
   since = Math.max(0, Math.min(n, +since || 0));
   const rows = n > since ? sh.getRange(since + 2, 1, n - since, HEAD.length).getValues() : [];
   // 網頁用的精簡格式：[id, 時間(ms), 平/片, key, 題型, 選的 key, 對錯, 毫秒, 模式]
-  const ev = rows.map(r => [String(r[0]), new Date(r[1]).getTime(), r[2] === '片' ? 'kata' : 'hira', r[9],
-    Object.keys(TYPE).find(k => TYPE[k] === r[4]) || r[4], r[10] || null, r[6] === '⭕', Math.round(r[7] * 1000),
+  const ev = rows.map(r => [String(r[0]), new Date(r[1]).getTime(), Object.keys(SC).find(k => SC[k] === r[2]) || 'hira', r[9],
+    typeKey_(r[4]), r[10] || null, r[6] === '⭕', Math.round(r[7] * 1000),
     Object.keys(MODE).find(k => MODE[k] === r[8]) || r[8]]);
-  return { ok: true, n: n, ev: ev, cfg: cfg_() };
+  return { ok: true, ver: 2, n: n, ev: ev, cfg: cfg_() };
 }
 
 function doGet(e) {
@@ -56,8 +61,10 @@ function doPost(e) {
     const sh = sheet_(LOG, HEAD), n = sh.getLastRow() - 1;
     const have = new Set(n > 0 ? sh.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);
     const rows = (b.ev || []).filter(v => v && !have.has(String(v[0]))).map(v => {
-      const sc = v[2] === 'kata' ? '片' : '平', show = (h) => (sc === '片' ? kata_(h) : (h || ''));
-      return [String(v[0]), new Date(v[1]), sc, show(v[3]), TYPE[v[4]] || v[4], show(v[5]), v[6] ? '⭕' : '❌', Math.round(v[7]) / 1000, MODE[v[8]] || v[8], v[3], v[5] || ''];
+      const sc = SC[v[2]] || '平', show = (h) => (sc === '片' ? kata_(h) : (h || ''));
+      // 日文課：字、選的 欄位放題目和選項的文字（v[9]、v[10]），key 欄放題目編號
+      const q = v[2] === 'jp' ? (v[9] || v[3]) : show(v[3]), a = v[2] === 'jp' ? (v[10] || v[5] || '') : show(v[5]);
+      return [String(v[0]), new Date(v[1]), sc, q, typeName_(v[4]), a, v[6] ? '⭕' : '❌', Math.round(v[7]) / 1000, MODE[v[8]] || v[8], v[3], v[5] || ''];
     });
     if (rows.length) sh.getRange(n + 2, 1, rows.length, HEAD.length).setValues(rows);
     // 設定：開放的行取聯集，清除時間取最新
@@ -68,6 +75,9 @@ function doPost(e) {
       c.reset[s] = r;
       if ((((b.reset || {})[s]) || 0) >= r) c.open[s] = [...new Set(c.open[s].concat(((b.open || {})[s]) || []))];
     });
+    const bj = b.jp || {};
+    if ((bj.reset || 0) > c.jp.reset) { c.jp.reset = bj.reset; c.jp.pass = {}; }
+    if ((bj.reset || 0) >= c.jp.reset) Object.keys(bj.pass || {}).forEach(k => { c.jp.pass[k] = Math.max(c.jp.pass[k] || 0, bj.pass[k]); });
     sheet_(CFG).getRange('A1').setValue(JSON.stringify(c));
   } finally { lock.releaseLock(); }
   return out_(read_(b.since));

@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>日文課練習</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Sans+JP:wght@400;700&display=swap">
+<style>
+/* CY 的日文課：課次大致對應《大家學標準日本語》初級本；練習、間隔複習、錯題本、通過測驗；紀錄同步到 Google 試算表 */
+:root { --bg:#eef1f5; --card:#fff; --ink:#141a24; --muted:#5d6878; --line:#d5dbe4; --blue:#2b5fd9; --ok:#1f8a4c; --no:#d2453b;
+  --l0:#e9edf2; --l1:#f7d4cf; --l2:#fbe7b5; --l3:#cdeed9; --l4:#9fdcb6; --pick:#eef3ff; --soft:#f4f6f9;
+  --near:#dbe8ff; --mid:#ffe6cc; --far:#d9f2e1; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0f131a; --card:#181e28; --ink:#e8edf4; --muted:#95a1b3; --line:#2a3342; --blue:#7ea2ff; --ok:#5fd394; --no:#ff7a6e;
+  --l0:#222a36; --l1:#5a2a28; --l2:#5a4a1e; --l3:#1f4a33; --l4:#2a6b47; --pick:#1d2740; --soft:#141922; --near:#1e2c4a; --mid:#4a3620; --far:#1f3a2a; color-scheme:dark; } }
+:root[data-theme="dark"] { --bg:#0f131a; --card:#181e28; --ink:#e8edf4; --muted:#95a1b3; --line:#2a3342; --blue:#7ea2ff; --ok:#5fd394; --no:#ff7a6e;
+  --l0:#222a36; --l1:#5a2a28; --l2:#5a4a1e; --l3:#1f4a33; --l4:#2a6b47; --pick:#1d2740; --soft:#141922; --near:#1e2c4a; --mid:#4a3620; --far:#1f3a2a; color-scheme:dark; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 "Noto Sans TC",system-ui,-apple-system,"Microsoft JhengHei",sans-serif;
+  padding:calc(16px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
+main { max-width:560px; margin:0 auto; display:grid; gap:14px; }
+a { color:var(--blue); }
+.jp { font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif; }
+ruby rt { font-size:.5em; color:var(--muted); font-weight:400; }
+.top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.top a { text-decoration:none; font-size:15px; }
+h1 { font-size:24px; font-weight:900; margin:0; }
+h2 { font-size:13px; font-weight:700; letter-spacing:.1em; color:var(--muted); margin:0 0 8px; }
+h3 { font-size:18px; margin:0 0 6px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+.muted { color:var(--muted); font-size:14px; }
+button { font:inherit; cursor:pointer; }
+button.big { width:100%; border:0; border-radius:12px; padding:13px; font-size:17px; font-weight:700; background:var(--blue); color:#fff; }
+button.ghost { border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:12px; padding:10px 12px; font-size:15px; }
+button:disabled { opacity:.5; cursor:default; }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.bar { height:8px; border-radius:4px; background:var(--l0); overflow:hidden; display:flex; }
+.bar i { display:block; }
+.badge { font-size:12px; font-weight:700; border-radius:999px; padding:2px 9px; white-space:nowrap; }
+.b0 { background:var(--l0); color:var(--muted); } .b1 { background:var(--l2); color:#7a5600; } .b2 { background:var(--l3); color:var(--ok); }
+/* 課程卡 */
+.les { display:grid; gap:8px; }
+.les .hd { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.les .no { font-size:13px; color:var(--muted); font-weight:700; }
+.les.soon { opacity:.45; }
+.goals { display:flex; flex-wrap:wrap; gap:4px; }
+.goals span { font-size:12px; background:var(--soft); border:1px solid var(--line); border-radius:6px; padding:1px 6px; color:var(--muted); }
+/* 重點頁 */
+.pat { background:var(--pick); border-radius:10px; padding:8px 12px; font-size:20px; margin:6px 0; }
+.ex { display:grid; grid-template-columns:auto 1fr; gap:4px 10px; align-items:center; padding:7px 0; border-top:1px solid var(--line); }
+.ex .s { font-size:19px; line-height:1.9; }
+.ex .z { grid-column:2; font-size:14px; color:var(--muted); margin-top:-4px; }
+.play { border:0; background:var(--pick); border-radius:50%; width:38px; height:38px; font-size:17px; }
+.words { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; }
+.wd { border:1px solid var(--line); background:var(--soft); border-radius:12px; padding:8px 10px; text-align:left; color:var(--ink); display:grid; grid-template-columns:auto 1fr; gap:0 8px; align-items:center; }
+.wd .p { font-size:30px; grid-row:span 2; }
+.wd b { font-size:19px; font-weight:700; }
+.wd small { color:var(--muted); font-size:13px; }
+.wd.lv1 { border-color:var(--no); } .wd.lv3, .wd.lv4 { border-color:var(--ok); }
+/* 題目 */
+.hud { display:flex; justify-content:space-between; font-size:14px; color:var(--muted); }
+.qbox { text-align:center; padding:6px 0 2px; }
+.qpic { font-size:84px; line-height:1.2; }
+.qk { font-size:54px; line-height:1.3; }
+.qs { font-size:23px; line-height:2.1; }
+.qz { font-size:15px; color:var(--muted); }
+.qhint { font-size:15px; color:var(--muted); margin-top:4px; }
+.blank { display:inline-block; min-width:2.6em; border-bottom:3px solid var(--blue); margin:0 3px; }
+.spk { border:0; width:86px; height:86px; border-radius:50%; background:var(--pick); font-size:38px; }
+.opts { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:12px; }
+.opts.one { grid-template-columns:1fr; }
+.opts button { border:2px solid var(--line); background:var(--card); color:var(--ink); border-radius:12px; padding:10px 6px; font-size:20px; min-height:60px; line-height:1.5; }
+.opts button.zh { font-size:16px; text-align:left; padding:10px 12px; }
+.opts button.right { border-color:var(--ok); background:var(--l3); }
+.opts button.wrong { border-color:var(--no); background:var(--l1); }
+.chips { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; min-height:52px; }
+.chips button { border:2px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; padding:6px 12px; font-size:20px; line-height:1.6; }
+.chips button.used { visibility:hidden; }
+.built { border:2px dashed var(--line); border-radius:12px; min-height:58px; padding:6px; margin:10px 0; }
+.built.ok { border-color:var(--ok); background:var(--l3); } .built.no { border-color:var(--no); background:var(--l1); }
+.fb { margin-top:10px; font-size:16px; text-align:center; }
+.fb.ok { color:var(--ok); } .fb.no { color:var(--no); }
+.fb .ans { color:var(--ink); font-size:20px; line-height:2; }
+.next { display:flex; gap:10px; justify-content:center; margin-top:10px; }
+/* 動手玩 */
+.lab svg { width:100%; height:auto; display:block; touch-action:manipulation; }
+.lab .obj { cursor:pointer; }
+.lab .obj text { transition:transform .25s; }
+@keyframes bounce { 0%,100% { transform:translateY(0) } 40% { transform:translateY(-14px) } }
+.lab .obj.hit text { animation:bounce .5s; transform-box:fill-box; transform-origin:center; }
+@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.25 } }
+.lab .obj.tgt circle.ring { animation:pulse .8s infinite; }
+.say { min-height:3.2em; text-align:center; font-size:22px; line-height:1.9; }
+.hours { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; }
+.hours button { border:1px solid var(--line); background:var(--soft); color:var(--ink); border-radius:10px; padding:5px 2px; font-size:16px; line-height:1.3; }
+.hours button small { display:block; font-size:12px; color:var(--muted); }
+.hours button.trap { border-color:var(--no); }
+.hours button.trap small { color:var(--no); font-weight:700; }
+#hand { transition:transform .7s cubic-bezier(.5,1.6,.5,1); transform-origin:100px 100px; }
+.seg { display:grid; grid-template-columns:1fr 1fr; background:var(--soft); border:1px solid var(--line); border-radius:12px; padding:4px; gap:4px; }
+.seg button { border:0; background:none; font-size:15px; font-weight:700; padding:8px; border-radius:9px; color:var(--muted); }
+.seg button.on { background:var(--blue); color:#fff; }
+</style>
+</head>
+<body>
+<main id="app"><p class="muted">載入中…</p></main>
+<script>
+// ---------- 雲端同步（和 50 音共用 Google 試算表；Apps Script 第 2 版才收日文課的紀錄）----------
+const SYNC_URL = 'https://script.google.com/macros/s/AKfycby4oFDgD33QH4tcn_Vn9bIXRYWGGTQZ6vh_QRUtiaCiwhsle3L3Eb0ByBDtt6zWqFUzGw/exec';
+const SYNC_KEY = 'V0fNiZTXgSPpvJHi';
+const KEY = 'cy-jp-v1';
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+if (!S || !S.it) S = { it: {}, log: [], pass: {}, reset: 0, q: [], srvN: 0, furi: true };
+if (!S.dev) S.dev = Math.random().toString(36).slice(2, 7);
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+const app = document.getElementById('app');
+const esc = (s) => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+const R = { pick: a => a[Math.floor(Math.random() * a.length)], shuffle: a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; } };
+// 漢字[讀音] → 上方小字；plain 是去掉讀音的文字
+const ruby = (s) => esc(s).replace(/([0-9々一-鿿]+)\[([^\]]+)\]/g, (m, b, r) => S.furi ? '<ruby>' + b + '<rt>' + r + '</rt></ruby>' : b);
+const plain = (s) => s.replace(/\[[^\]]*\]/g, '');
+let audio = null;
+function play(id) { try { if (audio) audio.pause(); audio = new Audio('jp/audio/' + id + '.mp3'); audio.play().catch(() => {}); } catch (e) {} }
+
+// ---------- 題庫 ----------
+let D = null, ITEMS = {}, BYL = {};
+const SOON = ['', '', '', '', '去哪裡、怎麼去（へ・で）', '每天做什麼（を・動詞變化・副詞）', '形容詞、想要～（たい）', '有、在、喜歡（が・あります・います）', '給、收到（あげます・もらいます）', '數東西（量詞）', '昨天、以前（過去式）', '比較（より・ほど・いちばん）', '動詞的應用（提議、一邊～一邊～）'];
+const NOSPLIT = ['この', 'その', 'あの', 'どの', 'いっしょに', 'すみません', 'ちがいます', 'ください', 'よろしく', 'はじめまして', 'ありません', 'ちょっと…'];
+function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾的 です/ます 和助詞切開
+  const body = jp.replace(/[。？！]$/, '');
+  const out = [];
+  body.split(/[ 、。]/).filter(Boolean).forEach(ch => {
+    if (NOSPLIT.includes(plain(ch))) { out.push(ch); return; }
+    const tail = []; let rest = ch;
+    const suf = ['ませんか', 'ましょう', 'ますか', 'ですか', 'ですね', 'ません', 'です', 'ます'].find(x => rest.endsWith(x) && plain(rest).length > x.length);
+    if (suf) { tail.unshift(suf); rest = rest.slice(0, -suf.length); }
+    const pt = ['では', 'じゃ', 'は', 'を', 'に', 'で', 'と', 'の', 'が', 'へ', 'も'].find(x => rest.endsWith(x) && plain(rest).length > x.length);
+    if (pt) { tail.unshift(pt); rest = rest.slice(0, -pt.length); }
+    out.push(rest, ...tail);
+  });
+  return out.filter(Boolean);
+}
+function loadData(d) {
+  D = d;
+  d.lessons.forEach(L => {
+    BYL[L.no] = L; L.items = [];
+    L.words.forEach(w => { const it = Object.assign({ kind: 'w', L: L.no }, w); ITEMS[w.id] = it; L.items.push(it); });
+    L.sents.forEach(s => { const it = Object.assign({ kind: 's', L: L.no }, s); it.chips = chipsOf(s.jp); ITEMS[s.id] = it; L.items.push(it); });
+  });
+}
+const hasKanji = (s) => /[一-鿿]/.test(s);
+function typesOf(it) {
+  if (it.kind === 'w') return [it.pic ? 'pic' : null, hasKanji(it.k) ? 'read' : null, 'mean', 'hear'].filter(Boolean);
+  return [it.blank ? 'fill' : null, it.chips.length >= 3 ? 'order' : null, 'listen'].filter(Boolean);
+}
+
+// ---------- 熟練度 ----------
+const LIM = { pic: 8000, read: 8000, mean: 8000, hear: 8000, fill: 15000, listen: 15000, order: 30000 };
+function applyEv(e) {
+  const s = S.it[e.h] || (S.it[e.h] = { box: 0, n: 0, ok: 0, bad: 0, fix: 0, last: 0 });
+  s.n++; s.last = e.t;
+  if (e.ok) { s.ok++; if (e.m === 'pass') s.box = Math.max(s.box + 1, 3); else if (e.ms < (LIM[e.type] || 10000)) s.box = Math.min(5, s.box + 1); if (s.fix > 0) s.fix--; }
+  else { s.bad++; s.box = 0; s.fix = 2; }
+}
+function rebuild() { S.log.sort((a, b) => a.t - b.t); S.it = {}; S.log.forEach(applyEv); }
+const evArr = (e) => [e.i, e.t, 'jp', e.h, e.type, e.a, e.ok, e.ms, e.m, e.qd, e.ad];
+const evObj = (v) => ({ i: v[0], t: v[1], h: v[3], type: v[4], a: v[5] || null, ok: !!v[6], ms: v[7], m: v[8] });
+function record(it, type, a, ad, ok, ms, mode) {
+  const t = Date.now(), e = { i: t.toString(36) + '-' + S.dev, t, h: it.id, type, a, ok, ms, m: mode, qd: it.kind === 'w' ? it.k : plain(it.jp), ad };
+  applyEv(e); S.log.push(e); S.q.push(evArr(e));
+  if (S.log.length > 30000) S.log = S.log.slice(-30000);
+  save();
+}
+const st = (id) => S.it[id] || { box: 0, n: 0, fix: 0 };
+const lv = (id) => { const s = S.it[id]; if (!s || !s.n) return 0; if (s.fix > 0) return 1; return s.box >= 4 ? 4 : s.box >= 2 ? 3 : 2; };
+function lessonStat(L) {
+  const n = L.items.length, seen = L.items.filter(i => st(i.id).n).length, good = L.items.filter(i => st(i.id).box >= 3).length, fix = L.items.filter(i => st(i.id).fix > 0).length;
+  return { n, seen, good, fix, pass: !!S.pass[L.no] };
+}
+
+// ---------- 同步 ----------
+let syncMsg = '', syncing = null;
+function sync() {
+  if (syncing) return syncing;
+  const go = async () => {
+    if (!S.srvVer) {   // 先確認 Apps Script 是第 2 版（舊版會把日文課的紀錄當成平假名）
+      const d = await (await fetch(SYNC_URL + '?k=' + SYNC_KEY + '&since=' + S.srvN)).json();
+      if (!d.ok) throw new Error(d.err);
+      if ((d.ver || 1) < 2) { syncMsg = '⏳ 雲端還沒更新（Apps Script 要換第 2 版），紀錄先存在這台' + (S.q.length ? '：' + S.q.length + ' 題待上傳' : ''); return false; }
+      S.srvVer = 2;
+    }
+    const sent = S.q.slice();
+    const d = await (await fetch(SYNC_URL, { method: 'POST', body: JSON.stringify({ k: SYNC_KEY, since: S.srvN, ev: sent, jp: { pass: S.pass, reset: S.reset } }) })).json();
+    if (!d.ok) throw new Error(d.err);
+    const ids = new Set(sent.map(v => v[0])); S.q = S.q.filter(v => !ids.has(v[0]));
+    let changed = false;
+    const cj = (d.cfg && d.cfg.jp) || { pass: {}, reset: 0 };
+    if (cj.reset > S.reset) { S.reset = cj.reset; S.log = []; S.it = {}; S.pass = {}; changed = true; }   // 別台按了清除
+    const have = new Set(S.log.map(e => e.i)); let add = false;
+    d.ev.filter(v => v[2] === 'jp' && v[1] >= S.reset && !have.has(v[0])).forEach(v => { S.log.push(evObj(v)); add = true; });
+    if (add) { rebuild(); changed = true; }
+    Object.keys(cj.pass || {}).forEach(k => { if ((cj.pass[k] || 0) > (S.pass[k] || 0)) { S.pass[k] = cj.pass[k]; changed = true; } });
+    S.srvN = d.n; save();
+    syncMsg = '☁️ 已同步 ' + new Date().toTimeString().slice(0, 5) + (S.q.length ? '，還有 ' + S.q.length + ' 題待上傳' : '');
+    return changed;
+  };
+  syncing = go().catch(() => { syncMsg = '⚠️ 暫時連不到雲端' + (S.q.length ? '，' + S.q.length + ' 題先存在這台，之後會補傳' : ''); return false; })
+    .finally(() => { syncing = null; const el = document.getElementById('sync'); if (el) el.textContent = syncMsg; });
+  return syncing;
+}
+function syncAndRefresh() { sync().then(ch => { if (ch && (location.hash === '' || location.hash === '#')) route(); }); }
+
+// ---------- 畫面 ----------
+function route() {
+  if (!D) return;
+  if (audio) audio.pause();
+  const h = location.hash.slice(1), [p, a] = h.split('/');
+  if (p === 'L' && BYL[a]) learn(BYL[a]);
+  else if (p === 'P' && BYL[a]) quiz('lesson', BYL[a]);
+  else if (p === 'T' && BYL[a]) quiz('pass', BYL[a]);
+  else if (p === 'mix') quiz('mix');
+  else if (p === 'fix') quiz('fix');
+  else if (p === 'lab' && a === 'kosoado') labKosoado();
+  else if (p === 'lab' && a === 'clock') labClock();
+  else home();
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', route);
+
+function home() {
+  const all = Object.values(ITEMS), fixN = all.filter(i => st(i.id).fix > 0).length, studied = all.filter(i => st(i.id).n).length;
+  const today = new Date().toDateString(), todayN = S.log.filter(e => new Date(e.t).toDateString() === today).length;
+  let h = '<div class="top"><a href="./">← 首頁</a><a href="kana.html">あ 50 音練習</a></div><h1>日文課練習</h1>' +
+    '<p class="muted" id="sync" style="margin:-6px 0 0">' + esc(syncMsg) + '</p>' +
+    '<div class="card"><div class="muted" style="margin-bottom:10px">配合《大家學標準日本語》初級本：看完一課影片就來練；已經會的課直接做「通過測驗」，過了就不用重看。</div>' +
+    '<div class="row2"><button class="big" ' + (studied ? '' : 'disabled') + ' onclick="location.hash=\'mix\'">🔁 綜合複習</button><button class="ghost" ' + (fixN ? '' : 'disabled') + ' onclick="location.hash=\'fix\'">📒 錯題本（' + fixN + '）</button></div>' +
+    '<p class="muted" style="margin:10px 0 0">今天答了 <b>' + todayN + '</b> 題・練過 <b>' + studied + '</b> / ' + all.length + ' 個單字和句子</p>' +
+    '<label class="muted" style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="furi" ' + (S.furi ? 'checked' : '') + '> 漢字上面顯示讀音</label></div>';
+  for (let no = 1; no <= 12; no++) {
+    const L = BYL[no];
+    if (!L) { h += '<div class="card les soon"><div class="hd"><span><span class="no">第 ' + no + ' 課</span><h3>' + esc(SOON[no]) + '</h3></span><span class="badge b0">製作中</span></div></div>'; continue; }
+    const s = lessonStat(L);
+    const badge = s.pass ? '<span class="badge b2">✅ 已通過</span>' : s.seen ? '<span class="badge b1">學習中</span>' : '<span class="badge b0">還沒開始</span>';
+    h += '<div class="card les"><div class="hd"><span><span class="no">第 ' + no + ' 課</span><h3>' + esc(L.title) + '</h3></span>' + badge + '</div>' +
+      '<div class="goals">' + L.goals.map(g => '<span>' + g.no + ' ' + esc(g.title) + '</span>').join('') + '</div>' +
+      '<div class="bar"><i style="width:' + s.good / s.n * 100 + '%;background:var(--l4)"></i><i style="width:' + (s.seen - s.good) / s.n * 100 + '%;background:var(--l2)"></i></div>' +
+      '<div class="muted">熟練 ' + s.good + ' / ' + s.n + (s.fix ? '・錯題 ' + s.fix : '') + '</div>' +
+      '<div class="row3"><button class="ghost" onclick="location.hash=\'L/' + no + '\'">📖 重點</button><button class="ghost" onclick="location.hash=\'P/' + no + '\'">✏️ 練習</button><button class="ghost" onclick="location.hash=\'T/' + no + '\'">⚡ 測驗</button></div>' +
+      (L.lab ? '<button class="ghost" onclick="location.hash=\'lab/' + L.lab.id + '\'">🎮 ' + esc(L.lab.title) + '</button>' : '') + '</div>';
+  }
+  h += '<p class="muted">單字、例句和說明是自己整理的，課次對應 App 的內容但不完全一樣。紀錄同步到 Google 試算表。</p>';
+  app.innerHTML = h;
+  app.querySelector('#furi').onchange = (e) => { S.furi = e.target.checked; save(); };
+}
+
+function learn(L) {
+  let h = '<div class="top"><a href="#">← 課程列表</a><span class="muted">第 ' + L.no + ' 課・重點</span></div><h1>' + esc(L.title) + '</h1>';
+  L.goals.forEach(g => {
+    h += '<div class="card"><h2>學習目標 ' + g.no + '</h2><h3>' + esc(g.title) + '</h3><div class="pat jp">' + ruby(g.pattern) + '</div><p style="margin:6px 0">' + esc(g.explain) + '</p>';
+    L.sents.filter(s => s.g === g.no).forEach(s => { h += '<div class="ex"><button class="play" data-a="' + s.id + '">▶</button><span class="s jp">' + ruby(s.jp) + '</span><span class="z">' + esc(s.zh) + '</span></div>'; });
+    if (L.lab && L.lab.goal === g.no) h += '<button class="ghost" style="width:100%;margin-top:8px" onclick="location.hash=\'lab/' + L.lab.id + '\'">🎮 ' + esc(L.lab.title) + '</button>';
+    h += '</div>';
+  });
+  h += '<div class="card"><h2>這課的單字（點一下聽）</h2><div class="words">' + L.words.map(w => '<button class="wd lv' + lv(w.id) + '" data-a="' + w.id + '"><span class="p">' + (w.pic || '　') + '</span><b class="jp">' + esc(w.k) + '</b><small><span class="jp">' + (w.k !== w.r ? esc(w.r) + '・' : '') + '</span>' + esc(w.zh) + '</small></button>').join('') + '</div></div>' +
+    '<div class="row2"><button class="big" onclick="location.hash=\'P/' + L.no + '\'">✏️ 開始練習</button><button class="ghost" onclick="location.hash=\'T/' + L.no + '\'">⚡ 通過測驗</button></div>';
+  app.innerHTML = h;
+  app.querySelectorAll('[data-a]').forEach(b => b.onclick = () => play(b.dataset.a));
+}
+
+// ---------- 出題 ----------
+function pool(L) { return L ? L.items : Object.values(ITEMS).filter(i => st(i.id).n); }
+function buildRound(mode, L) {
+  const items = mode === 'lesson' || mode === 'pass' ? L.items : pool();
+  if (mode === 'fix') return R.shuffle(Object.values(ITEMS).filter(i => st(i.id).fix > 0)).slice(0, 10).map(it => ({ it, type: R.pick(typesOf(it)) }));
+  if (mode === 'pass') {
+    const w = R.shuffle(L.items.filter(i => i.kind === 'w')).slice(0, 6), s = R.shuffle(L.items.filter(i => i.kind === 's')).slice(0, 6);
+    return R.shuffle(w.concat(s)).map(it => ({ it, type: R.pick(typesOf(it).filter(t => t !== 'hear') ) || 'mean', test: true }));
+  }
+  const out = [], used = new Set(), add = (it, intro) => { if (used.has(it.id) || out.length >= 10) return; used.add(it.id); out.push({ it, type: R.pick(typesOf(it)), intro }); };
+  R.shuffle(items.filter(i => st(i.id).fix > 0)).slice(0, 3).forEach(it => add(it));
+  if (mode === 'lesson') {
+    const fresh = items.filter(i => !st(i.id).n);
+    fresh.filter(i => i.kind === 'w').slice(0, 4).forEach(it => add(it, true));
+    fresh.filter(i => i.kind === 's').slice(0, 2).forEach(it => add(it, true));
+  }
+  const w = (it) => { const s = st(it.id); if (!s.n) return mode === 'lesson' ? 1 : -1; return (5 - Math.min(5, s.box)) * 2 + Math.min(6, (Date.now() - s.last) / 864e5) * 1.5 + Math.random() * 2; };
+  items.filter(i => w(i) >= 0).sort((a, b) => w(b) - w(a)).forEach(it => add(it));
+  return out;
+}
+function makeQ(it, type) {
+  const L = BYL[it.L], same = (k) => L.items.filter(i => i.kind === k && i.id !== it.id), others = (k) => Object.values(ITEMS).filter(i => i.kind === k && i.id !== it.id && i.L <= it.L);
+  const take = (arr, f, n) => { const seen = new Set([f(it)]), out = []; R.shuffle(arr).forEach(x => { const v = f(x); if (!seen.has(v) && out.length < n) { seen.add(v); out.push(x); } }); return out; };
+  const fill3 = (k, f, need) => { let o = take(same(k).filter(need || (() => true)), f, 3); if (o.length < 3) o = o.concat(take(others(k).filter(x => !o.includes(x) && (need || (() => true))(x)), f, 3 - o.length)); return o; };
+  let opts;
+  if (type === 'read') {
+    const trap = { 'よじ': 'よんじ', 'くじ': 'きゅうじ', 'しちじ': 'ななじ' }[it.r];
+    const o = take(others('w').filter(x => x.r !== it.r && hasKanji(x.k)), x => x.r, trap ? 2 : 3).map(x => x.r);
+    opts = R.shuffle([it.r].concat(trap ? [trap] : [], o)).map(r => ({ txt: r, ok: r === it.r }));
+  } else if (type === 'mean') opts = R.shuffle([it].concat(fill3('w', x => x.zh))).map(x => ({ txt: x.zh, ok: x === it, zh: true }));
+  else if (type === 'pic') opts = R.shuffle([it].concat(fill3('w', x => x.k))).map(x => ({ txt: x.k, sub: x.k !== x.r ? x.r : '', ok: x === it }));
+  else if (type === 'hear') opts = R.shuffle([it].concat(fill3('w', x => x.k))).map(x => ({ txt: x.k, ok: x === it, id: x.id }));
+  else if (type === 'listen') opts = R.shuffle([it].concat(fill3('s', x => x.zh))).map(x => ({ txt: x.zh, ok: x === it, zh: true }));
+  else if (type === 'fill') opts = R.shuffle([it.blank].concat(it.opts)).map(x => ({ txt: x, ok: x === it.blank, ruby: true }));
+  return { it, type, opts };
+}
+
+function quiz(mode, L) {
+  const qs = buildRound(mode, L);
+  const back = L ? '#L/' + L.no : '#';
+  if (!qs.length) { app.innerHTML = '<div class="top"><a href="#">← 課程列表</a></div><div class="card">' + (mode === 'fix' ? '錯題本是空的 🎉' : '還沒有練過的題目，先去練一課吧。') + '</div>'; return; }
+  const title = mode === 'pass' ? '⚡ 通過測驗' : mode === 'mix' ? '🔁 綜合複習' : mode === 'fix' ? '📒 錯題本' : '✏️ 練習';
+  let i = 0, score = 0, wrongs = [];
+  const header = () => '<div class="top"><a href="' + back + '">← ' + (L ? '第 ' + L.no + ' 課' : '課程列表') + '</a><span class="muted">' + title + '</span></div>' +
+    '<div class="hud"><span>' + (i + 1) + ' / ' + qs.length + '</span><span>答對 ' + score + '</span></div><div class="bar"><i style="width:' + i / qs.length * 100 + '%;background:var(--blue)"></i></div>';
+  const full = (it) => it.kind === 'w' ? '<span class="jp" style="font-size:26px">' + (it.pic ? it.pic + ' ' : '') + esc(it.k) + '</span>' + (it.k !== it.r ? '<span class="jp">（' + esc(it.r) + '）</span>' : '') + ' ＝ ' + esc(it.zh)
+    : '<div class="ans jp">' + ruby(it.jp) + '</div><div>' + esc(it.zh) + '</div>';
+  const goalTip = (it) => { if (it.kind !== 's') return ''; const g = BYL[it.L].goals.find(g => g.no === it.g); return g ? '<div class="muted" style="margin-top:6px">句型：<span class="jp">' + ruby(g.pattern) + '</span>（第 ' + it.L + ' 課・' + esc(g.title) + '）</div>' : ''; };
+  function show() {
+    if (i >= qs.length) return end();
+    const q0 = qs[i], it = q0.it;
+    if (q0.intro) {
+      app.innerHTML = header() + '<div class="card" style="text-align:center"><p class="muted" style="margin:0">' + (it.kind === 'w' ? '新的單字 ✨' : '新的句子 ✨') + '</p>' +
+        (it.kind === 'w' ? '<div class="qpic">' + (it.pic || '') + '</div><div class="qk jp">' + esc(it.k) + '</div>' + (it.k !== it.r ? '<div class="jp" style="font-size:22px">' + esc(it.r) + '</div>' : '') + '<p style="font-size:20px;margin:6px 0">' + esc(it.zh) + '</p>'
+          : '<div class="qs jp">' + ruby(it.jp) + '</div><p style="font-size:18px;margin:4px 0">' + esc(it.zh) + '</p>' + goalTip(it)) +
+        '<div class="next"><button class="ghost" id="ag">🔊 再聽一次</button><button class="big" style="width:auto;padding:12px 26px" id="go">記住了 →</button></div></div>';
+      play(it.id); app.querySelector('#ag').onclick = () => play(it.id);
+      app.querySelector('#go').onclick = () => { q0.intro = false; show(); };
+      return;
+    }
+    const q = makeQ(it, q0.type), t0 = Date.now();
+    let body = '';
+    if (q.type === 'pic') body = '<div class="qpic">' + it.pic + '</div><div class="qhint">這是什麼？</div>';
+    else if (q.type === 'read') body = '<div class="qk jp">' + esc(it.k) + '</div><div class="qhint">怎麼念？</div>';
+    else if (q.type === 'mean') body = '<div class="qk jp">' + esc(it.k) + '</div>' + (it.k !== it.r ? '<div class="jp muted" style="font-size:18px">' + esc(it.r) + '</div>' : '') + '<div class="qhint">是什麼意思？</div>';
+    else if (q.type === 'hear') body = '<button class="spk" id="spk">🔊</button><div class="qhint">聽一聽，是哪一個？</div>';
+    else if (q.type === 'listen') body = '<button class="spk" id="spk">🔊</button><div class="qhint">這句話是什麼意思？</div>';
+    else if (q.type === 'fill') { const idx = it.jp.indexOf(it.blank); body = '<div class="qs jp">' + ruby(it.jp.slice(0, idx)) + '<span class="blank">　</span>' + ruby(it.jp.slice(idx + it.blank.length)) + '</div><div class="qz">' + esc(it.zh) + '</div>'; }
+    else if (q.type === 'order') body = '<div class="qz" style="font-size:18px;color:var(--ink)">' + esc(it.zh) + '</div><div class="qhint">把詞卡排成日文句子</div>';
+    let h = header() + '<div class="card"><div class="qbox">' + body + '</div>';
+    if (q.type === 'order') {
+      const chips = R.shuffle(it.chips.map((c, k) => ({ c, k })));
+      h += '<div class="built chips jp" id="built"></div><div class="chips jp" id="pool">' + chips.map(x => '<button data-k="' + x.k + '">' + ruby(x.c) + '</button>').join('') + '</div>' +
+        '<div class="row2" style="margin-top:10px"><button class="ghost" id="clr">↺ 重排</button><button class="big" id="chk" disabled>確定</button></div>';
+    } else {
+      const wide = q.opts.some(o => o.zh && o.txt.length > 9);
+      h += '<div class="opts' + (wide ? ' one' : '') + '">' + q.opts.map((o, k) => '<button data-k="' + k + '" class="' + (o.zh ? 'zh' : 'jp') + '">' + (o.ruby ? ruby(o.txt) : esc(o.txt)) + (o.sub ? '<br><small class="muted">' + esc(o.sub) + '</small>' : '') + '</button>').join('') + '</div>';
+    }
+    if (q0.test) h += '<button class="ghost" style="width:100%;margin-top:10px" id="idk">不知道</button>';
+    h += '<div class="fb" id="fb"></div></div>';
+    app.innerHTML = h;
+    if (q.type === 'hear' || q.type === 'listen') { play(it.id); app.querySelector('#spk').onclick = () => play(it.id); }
+    const finish = (ok, a, ad) => {
+      const ms = Date.now() - t0;
+      record(it, q.type, a, ad, ok, ms, mode);
+      if (ok) score++; else wrongs.push(it);
+      const fb = app.querySelector('#fb'), idk = app.querySelector('#idk'); if (idk) idk.disabled = true;
+      play(it.id);
+      if (ok && q.type !== 'order' && q.type !== 'fill' && q.type !== 'listen') { fb.className = 'fb ok'; fb.innerHTML = '⭕ ' + full(it); setTimeout(() => { i++; show(); }, q0.test ? 700 : 1300); return; }
+      fb.className = 'fb ' + (ok ? 'ok' : 'no');
+      fb.innerHTML = (ok ? '⭕ 答對了' : '❌ ' + (a == null ? '沒關係，記下來' : '正確答案')) + '<div style="margin-top:6px">' + full(it) + '</div>' + (ok ? '' : goalTip(it)) +
+        '<div class="next"><button class="ghost" id="rep">🔊 再聽</button><button class="big" style="width:auto;padding:10px 24px" id="nx">下一題 →</button></div>';
+      app.querySelector('#rep').onclick = () => play(it.id);
+      app.querySelector('#nx').onclick = () => { i++; show(); };
+    };
+    if (q.type === 'order') {
+      const seq = [], built = app.querySelector('#built'), chk = app.querySelector('#chk');
+      const redraw = () => { built.innerHTML = seq.map(k => '<button data-b="' + k + '">' + ruby(it.chips[k]) + '</button>').join(''); chk.disabled = seq.length !== it.chips.length;
+        built.querySelectorAll('[data-b]').forEach(b => b.onclick = () => { const k = +b.dataset.b; seq.splice(seq.indexOf(k), 1); app.querySelector('#pool [data-k="' + k + '"]').classList.remove('used'); redraw(); }); };
+      app.querySelectorAll('#pool button').forEach(b => b.onclick = () => { if (b.classList.contains('used')) return; b.classList.add('used'); seq.push(+b.dataset.k); redraw(); });
+      app.querySelector('#clr').onclick = () => { seq.length = 0; app.querySelectorAll('#pool button').forEach(b => b.classList.remove('used')); redraw(); };
+      chk.onclick = () => {
+        const mine = seq.map(k => plain(it.chips[k])).join(''), ok = mine === it.chips.map(plain).join('');
+        built.classList.add(ok ? 'ok' : 'no'); app.querySelectorAll('#pool button, #built button, #clr, #chk').forEach(b => b.disabled = true);
+        finish(ok, mine, mine);
+      };
+    } else {
+      app.querySelectorAll('.opts button').forEach(b => b.onclick = () => {
+        const o = q.opts[+b.dataset.k];
+        app.querySelectorAll('.opts button').forEach((x, j) => { x.disabled = true; if (q.opts[j].ok) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
+        finish(o.ok, plain(o.txt), plain(o.txt));
+      });
+    }
+    if (q0.test) app.querySelector('#idk').onclick = () => { app.querySelectorAll('.opts button, #pool button, #chk').forEach(x => x.disabled = true); finish(false, null, '不知道'); };
+  }
+  function end() {
+    let extra = '';
+    if (mode === 'pass') {
+      const ok = score >= Math.ceil(qs.length * 0.8);
+      if (ok) { S.pass[L.no] = Date.now(); save(); }
+      extra = ok ? '<p style="font-size:18px">✅ 第 ' + L.no + ' 課通過！這課不用重看影片，之後會在綜合複習裡偶爾出現。</p>'
+        : '<p>還差一點（要答對 ' + Math.ceil(qs.length * 0.8) + ' 題）。建議先看「📖 重點」或 App 這課的影片，再「✏️ 練習」幾回合。</p>';
+    }
+    const ws = [...new Set(wrongs)];
+    app.innerHTML = '<div class="top"><a href="' + back + '">← ' + (L ? '第 ' + L.no + ' 課' : '課程列表') + '</a></div><div class="card" style="text-align:center"><div style="font-size:46px">' + (score >= qs.length * 0.8 ? '🎉' : '💪') + '</div><h1>答對 ' + score + ' / ' + qs.length + '</h1>' + extra +
+      (ws.length ? '<div style="text-align:left;margin-top:10px"><h2>這回合答錯的（已放進錯題本）</h2>' + ws.map(it => '<div style="padding:4px 0;border-top:1px solid var(--line)">' + (it.kind === 'w' ? '<span class="jp">' + esc(it.k) + (it.k !== it.r ? '（' + esc(it.r) + '）' : '') + '</span> ' + esc(it.zh) : '<span class="jp">' + ruby(it.jp) + '</span><br><span class="muted">' + esc(it.zh) + '</span>') + '</div>').join('') + '</div>' : '') +
+      '<div class="row2" style="margin-top:14px"><button class="big" id="again">再一回合 ↺</button><button class="ghost" onclick="location.hash=\'\'">課程列表</button></div></div>';
+    app.querySelector('#again').onclick = () => quiz(mode === 'pass' && score >= qs.length * 0.8 ? 'lesson' : mode, L);
+    sync();
+  }
+  show();
+}
+
+// ---------- 動手玩：これ・それ・あれ ----------
+const KO = { kasa: ['☂️', '傘[かさ]'], saifu: ['👛', '財布[さいふ]'], tokei: ['⌚', '時計[とけい]'], kippu: ['🎫', '切符[きっぷ]'] };
+const KOF = { eki: ['🚉', '駅[えき]'], toire: ['🚻', 'トイレ'] };
+function person(x, color, label) {
+  return '<g transform="translate(' + x + ' 150)"><circle cy="-62" r="16" fill="#f6d2b0"/><rect x="-16" y="-46" width="32" height="44" rx="12" fill="' + color + '"/>' +
+    '<rect x="-12" y="-4" width="9" height="26" rx="4" fill="#3e4a6b"/><rect x="3" y="-4" width="9" height="26" rx="4" fill="#3e4a6b"/>' +
+    '<text y="-86" text-anchor="middle" font-size="13" fill="currentColor" font-weight="700">' + label + '</text></g>';
+}
+function labKosoado() {
+  let mode = 'thing', cur = null, quizN = 0, score = 0, target = null, busy = false;
+  const roll = () => { const ks = R.shuffle(Object.keys(KO)); cur = { near: ks[0], mid: ks[1], far: R.pick(Object.keys(KOF)) }; };
+  roll();
+  const svg = () => {
+    const o = (pos, key, x, y, size, ring) => { const e = (pos === 'far' ? KOF : KO)[key][0];
+      return '<g class="obj' + (target === pos ? ' tgt' : '') + '" data-pos="' + pos + '"><circle class="ring" cx="' + x + '" cy="' + (y - size * .35) + '" r="' + ring + '" fill="none" stroke="var(--blue)" stroke-width="3" stroke-dasharray="5 4" opacity="' + (target === pos ? 1 : 0) + '"/>' +
+        '<text x="' + x + '" y="' + y + '" font-size="' + size + '" text-anchor="middle">' + e + '</text></g>'; };
+    return '<svg viewBox="0 0 360 215" role="img" aria-label="我、你和遠處的東西" style="color:var(--ink)">' +
+      '<ellipse cx="85" cy="172" rx="70" ry="22" fill="var(--near)"/><ellipse cx="205" cy="172" rx="62" ry="22" fill="var(--mid)"/><ellipse cx="315" cy="112" rx="42" ry="16" fill="var(--far)"/>' +
+      '<text x="22" y="182" font-size="13" fill="var(--blue)" font-weight="700">ここ</text><text x="244" y="182" font-size="13" fill="#c26a00" font-weight="700">そこ</text><text x="300" y="138" font-size="13" fill="var(--ok)" font-weight="700">あそこ</text>' +
+      '<line x1="0" y1="194" x2="360" y2="194" stroke="var(--line)" stroke-width="2"/><path d="M262 120 L360 98" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 4"/>' +
+      person(60, '#4c8be0', 'わたし') + person(180, '#e98a3a', 'あなた') +
+      o('near', cur.near, 112, 170, 36, 26) + o('mid', cur.mid, 228, 170, 36, 26) + o('far', cur.far, 318, 106, 30, 22) + '</svg>';
+  };
+  const word = (pos) => pos === 'far' ? KOF[cur.far][1] : KO[cur[pos]][1];
+  const key = (pos) => cur[pos];
+  const sentence = (pos) => mode === 'thing' ? { near: 'これは ', mid: 'それは ', far: 'あれは ' }[pos] + word(pos) + 'です。' : word(pos) + 'は ' + { near: 'ここ', mid: 'そこ', far: 'あそこ' }[pos] + 'です。';
+  const clip = (pos) => 'ko-' + (mode === 'thing' ? { near: 'kore', mid: 'sore', far: 'are' } : { near: 'koko', mid: 'soko', far: 'asoko' })[pos] + '-' + key(pos);
+  function draw(msg) {
+    app.innerHTML = '<div class="top"><a href="#L/2">← 第 2 課</a><span class="muted">🎮 動手玩</span></div><h1>これ・それ・あれ</h1>' +
+      '<div class="seg"><button data-m="thing" class="' + (mode === 'thing' ? 'on' : '') + '">指東西 これ・それ・あれ</button><button data-m="place" class="' + (mode === 'place' ? 'on' : '') + '">指地方 ここ・そこ・あそこ</button></div>' +
+      '<div class="card lab">' + svg() + '<div class="say jp" id="say">' + (msg || '<span class="muted" style="font-size:15px">點圖上的東西，聽「わたし」怎麼說</span>') + '</div>' +
+      (target ? '<div class="opts" style="grid-template-columns:repeat(3,1fr)">' + (mode === 'thing' ? ['これ', 'それ', 'あれ'] : ['ここ', 'そこ', 'あそこ']).map(x => '<button class="jp" data-ans="' + x + '">' + x + '</button>').join('') + '</div>'
+        : '<button class="big" id="qz" style="margin-top:8px">🎯 考考我（5 題）</button>') +
+      (quizN ? '<p class="muted" style="text-align:center;margin:8px 0 0">第 ' + Math.min(quizN, 5) + ' / 5 題・答對 ' + score + '</p>' : '') +
+      '<p class="muted" style="margin:10px 0 0">站在「わたし」的位置想：在我旁邊的用 これ／ここ，在「あなた」旁邊的用 それ／そこ，離兩個人都遠的用 あれ／あそこ。</p></div>';
+    app.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { mode = b.dataset.m; target = null; quizN = 0; score = 0; draw(); });
+    app.querySelectorAll('.obj').forEach(g => g.onclick = () => { if (target || busy) return; const pos = g.dataset.pos; draw(ruby(sentence(pos))); const el = app.querySelector('.obj[data-pos="' + pos + '"]'); el.classList.add('hit'); play(clip(pos)); });
+    const qz = app.querySelector('#qz'); if (qz) qz.onclick = () => { quizN = 1; score = 0; next(); };
+    app.querySelectorAll('[data-ans]').forEach(b => b.onclick = () => {
+      if (busy) return; busy = true;
+      const right = (mode === 'thing' ? { near: 'これ', mid: 'それ', far: 'あれ' } : { near: 'ここ', mid: 'そこ', far: 'あそこ' })[target], ok = b.dataset.ans === right;
+      if (ok) score++;
+      app.querySelectorAll('[data-ans]').forEach(x => { x.disabled = true; if (x.dataset.ans === right) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
+      app.querySelector('#say').innerHTML = (ok ? '⭕ ' : '❌ ') + ruby(sentence(target)); play(clip(target));
+      setTimeout(() => { busy = false; quizN++; if (quizN > 5) { target = null; draw('🎉 5 題答對 ' + score + ' 題' + (score === 5 ? '，全對！' : '，再玩一次？')); quizN = 0; } else next(); }, 2200);
+    });
+  }
+  function next() { roll(); target = R.pick(['near', 'mid', 'far']); draw('<span style="font-size:17px">「わたし」要說閃爍的那個' + (mode === 'thing' ? '東西' : '地方') + '，用哪一個？</span>'); }
+  draw();
+}
+
+// ---------- 動手玩：時鐘 ----------
+const HR = ['いちじ', 'にじ', 'さんじ', 'よじ', 'ごじ', 'ろくじ', 'しちじ', 'はちじ', 'くじ', 'じゅうじ', 'じゅういちじ', 'じゅうにじ'];
+const TRAP = { 4: '不念 よんじ', 7: '不念 ななじ', 9: '不念 きゅうじ' };
+function labClock() {
+  let hour = 12, quizN = 0, score = 0, ask = null, busy = false, turns = 0, shown = 360;   // shown：畫面上指針目前的角度（重畫後再轉到新角度，才有動畫）
+  const face = () => { let s = '<svg viewBox="0 0 200 200" style="max-width:240px;margin:0 auto;color:var(--ink)"><circle cx="100" cy="100" r="92" fill="var(--soft)" stroke="var(--line)" stroke-width="5"/>';
+    for (let n = 1; n <= 12; n++) { const a = n / 12 * 2 * Math.PI; s += '<text x="' + (100 + 72 * Math.sin(a)) + '" y="' + (100 - 72 * Math.cos(a) + 7) + '" text-anchor="middle" font-size="19" font-weight="700" fill="' + (TRAP[n] ? 'var(--no)' : 'currentColor') + '">' + n + '</text>'; }
+    return s + '<line x1="100" y1="100" x2="100" y2="30" stroke="var(--muted)" stroke-width="4" stroke-linecap="round"/><line id="hand" x1="100" y1="100" x2="100" y2="50" stroke="var(--blue)" stroke-width="8" stroke-linecap="round" style="transform:rotate(' + shown + 'deg)"/><circle cx="100" cy="100" r="7" fill="var(--blue)"/></svg>'; };
+  function draw(msg) {
+    app.innerHTML = '<div class="top"><a href="#L/3">← 第 3 課</a><span class="muted">🎮 動手玩</span></div><h1>幾點？</h1><div class="card lab">' + face() +
+      '<div class="say jp" id="say">' + (msg || '<span class="muted" style="font-size:15px">點下面的時間，時鐘會轉過去並念出來</span>') + '</div>' +
+      (ask ? '<div class="opts">' + ask.opts.map(o => '<button class="jp" data-o="' + o + '">' + o + '</button>').join('') + '</div>'
+        : '<div class="hours">' + HR.map((r, k) => '<button class="jp' + (TRAP[k + 1] ? ' trap' : '') + '" data-h="' + (k + 1) + '">' + (k + 1) + '時<small>' + r + '</small></button>').join('') + '</div><button class="big" id="qz" style="margin-top:10px">🎯 考考我（6 題）</button>') +
+      (quizN ? '<p class="muted" style="text-align:center;margin:8px 0 0">第 ' + Math.min(quizN, 6) + ' / 6 題・答對 ' + score + '</p>' : '') +
+      '<p class="muted" style="margin:10px 0 0">紅色的 4、7、9 點是特別念法：<span class="jp">よじ、しちじ、くじ</span>。說「幾點做什麼」要加「に」：<span class="jp">' + ruby('7時[しちじ]に 会[あ]いましょう') + '</span>。</p></div>';
+    app.querySelectorAll('[data-h]').forEach(b => b.onclick = () => setHour(+b.dataset.h, true));
+    const qz = app.querySelector('#qz'); if (qz) qz.onclick = () => { quizN = 1; score = 0; next(); };
+    app.querySelectorAll('[data-o]').forEach(b => b.onclick = () => {
+      if (busy) return; busy = true;
+      const right = HR[ask.h - 1], ok = b.dataset.o === right; if (ok) score++;
+      app.querySelectorAll('[data-o]').forEach(x => { x.disabled = true; if (x.dataset.o === right) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
+      app.querySelector('#say').innerHTML = (ok ? '⭕ ' : '❌ ') + ask.h + '時 ＝ ' + right + (TRAP[ask.h] ? '（' + TRAP[ask.h] + '）' : '');
+      play('clock-' + String(ask.h).padStart(2, '0'));
+      setTimeout(() => { busy = false; quizN++; if (quizN > 6) { ask = null; quizN = 0; draw('🎉 6 題答對 ' + score + ' 題'); } else next(); }, 2000);
+    });
+  }
+  function setHour(h, speak) {
+    const d = (h - hour + 12) % 12; if (h <= hour && d !== 0) turns++; if (d === 0 && h !== hour) turns++;
+    hour = h; const ang = turns * 360 + h * 30;
+    draw(speak ? h + '時 ＝ <b>' + HR[h - 1] + '</b>' + (TRAP[h] ? '<span style="color:var(--no);font-size:16px">（' + TRAP[h] + '）</span>' : '') : null);
+    requestAnimationFrame(() => requestAnimationFrame(() => { const el = document.getElementById('hand'); if (el) el.style.transform = 'rotate(' + ang + 'deg)'; shown = ang; }));
+    if (speak) play('clock-' + String(h).padStart(2, '0'));
+  }
+  function next() {
+    const h = R.pick([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].filter(x => x !== hour));
+    const trap = { 4: 'よんじ', 7: 'ななじ', 9: 'きゅうじ' }[h];
+    const others = R.shuffle(HR.filter((r, k) => k !== h - 1)).slice(0, trap ? 2 : 3);
+    ask = { h, opts: R.shuffle([HR[h - 1]].concat(trap ? [trap] : [], others)) };
+    setHour(h, false);
+    app.querySelector('#say').innerHTML = '<span style="font-size:17px">時鐘指著幾點？怎麼念？</span>';
+  }
+  draw();
+}
+
+fetch('jp/lessons.json', { cache: 'no-cache' }).then(r => r.json()).then(d => { loadData(d); route(); syncAndRefresh(); })
+  .catch(() => { app.innerHTML = '<div class="card">題庫載入失敗，請重新整理。</div>'; });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && D) syncAndRefresh(); });
+</script>
+</body>
+</html>
