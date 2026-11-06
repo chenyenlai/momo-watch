@@ -171,8 +171,12 @@ function autoUnlock() {
 }
 
 // ---------- 聲音 ----------
-let audio = null;
-function play(c) { try { if (audio) audio.pause(); audio = new Audio('kana/' + c.snd + '.mp3'); audio.play().catch(() => {}); } catch (e) {} }
+// iPhone Safari：只有手指點下去時才能開始播放；第一次點畫面就用同一個播放器先播一段無聲，之後自動播放才不會被擋
+const audio = new Audio();
+let audioOK = false;
+function unlockAudio() { if (audioOK) return; audioOK = true; try { audio.src = 'silent.mp3'; audio.play().catch(() => { audioOK = false; }); } catch (e) { audioOK = false; } }
+document.addEventListener('pointerdown', unlockAudio, true); document.addEventListener('touchend', unlockAudio, true);
+function play(c) { try { audio.pause(); audio.src = 'kana/' + c.snd + '.mp3'; audio.currentTime = 0; audio.play().catch(() => {}); } catch (e) {} }
 
 // ---------- 畫面 ----------
 const app = document.getElementById('app');

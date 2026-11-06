@@ -121,8 +121,12 @@ const R = { pick: a => a[Math.floor(Math.random() * a.length)], shuffle: a => { 
 // 漢字[讀音] → 上方小字；plain 是去掉讀音的文字
 const ruby = (s) => esc(s).replace(/([0-9々一-鿿]+)\[([^\]]+)\]/g, (m, b, r) => S.furi ? '<ruby>' + b + '<rt>' + r + '</rt></ruby>' : b);
 const plain = (s) => s.replace(/\[[^\]]*\]/g, '');
-let audio = null;
-function play(id) { try { if (audio) audio.pause(); audio = new Audio('jp/audio/' + id + '.mp3'); audio.play().catch(() => {}); } catch (e) {} }
+// iPhone Safari：只有手指點下去時才能開始播放；所以第一次點畫面就用同一個播放器先播一段無聲，之後自動播放才不會被擋
+const audio = new Audio(), SILENT = 'silent.mp3';
+let audioOK = false;
+function unlockAudio() { if (audioOK) return; audioOK = true; try { audio.src = SILENT; audio.play().catch(() => { audioOK = false; }); } catch (e) { audioOK = false; } }
+document.addEventListener('pointerdown', unlockAudio, true); document.addEventListener('touchend', unlockAudio, true);
+function play(id) { try { audio.pause(); audio.src = 'jp/audio/' + id + '.mp3'; audio.currentTime = 0; audio.play().catch(() => {}); } catch (e) {} }
 
 // ---------- 題庫 ----------
 let D = null, ITEMS = {}, BYL = {};
@@ -215,7 +219,7 @@ function syncAndRefresh() { sync().then(ch => { if (ch && (location.hash === '' 
 // ---------- 畫面 ----------
 function route() {
   if (!D) return;
-  if (audio) audio.pause();
+  audio.pause();
   const h = location.hash.slice(1), [p, a] = h.split('/');
   if (p === 'L' && BYL[a]) learn(BYL[a]);
   else if (p === 'P' && BYL[a]) quiz('lesson', BYL[a]);
@@ -299,7 +303,7 @@ function makeQ(it, type) {
     const o = take(others('w').filter(x => x.r !== it.r && hasKanji(x.k)), x => x.r, trap ? 2 : 3).map(x => x.r);
     opts = R.shuffle([it.r].concat(trap ? [trap] : [], o)).map(r => ({ txt: r, ok: r === it.r }));
   } else if (type === 'mean') opts = R.shuffle([it].concat(fill3('w', x => x.zh))).map(x => ({ txt: x.zh, ok: x === it, zh: true }));
-  else if (type === 'pic') opts = R.shuffle([it].concat(fill3('w', x => x.k))).map(x => ({ txt: x.k, sub: x.k !== x.r ? x.r : '', ok: x === it }));
+  else if (type === 'pic') opts = R.shuffle([it].concat(fill3('w', x => x.k, x => !!x.pic))).map(x => ({ txt: x.k, sub: x.k !== x.r ? x.r : '', ok: x === it }));
   else if (type === 'hear') opts = R.shuffle([it].concat(fill3('w', x => x.k))).map(x => ({ txt: x.k, ok: x === it, id: x.id }));
   else if (type === 'listen') opts = R.shuffle([it].concat(fill3('s', x => x.zh))).map(x => ({ txt: x.zh, ok: x === it, zh: true }));
   else if (type === 'fill') opts = R.shuffle([it.blank].concat(it.opts)).map(x => ({ txt: x, ok: x === it.blank, ruby: true }));
