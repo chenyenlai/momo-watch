@@ -81,6 +81,13 @@ button:disabled { opacity:.5; cursor:default; }
 .fb { margin-top:10px; font-size:16px; text-align:center; }
 .fb.ok { color:var(--ok); } .fb.no { color:var(--no); }
 .fb .ans { color:var(--ink); font-size:20px; line-height:2; }
+.brk { display:flex; flex-wrap:wrap; gap:4px 6px; justify-content:center; margin:8px 0 4px; }
+.brk span { display:grid; text-align:center; background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:2px 7px; }
+.brk b { font-size:18px; font-weight:400; line-height:1.8; }
+.brk small { font-size:12px; color:var(--muted); line-height:1.3; }
+.note { text-align:left; font-size:14px; background:var(--l2); color:var(--ink); border-radius:10px; padding:8px 10px; margin:6px 0; }
+.ex .brkw { grid-column:2; }
+.ex .zb { border:0; background:none; color:var(--blue); font-size:13px; padding:0; justify-self:start; grid-column:2; }
 .next { display:flex; gap:10px; justify-content:center; margin-top:10px; }
 /* 動手玩 */
 .lab svg { width:100%; height:auto; display:block; touch-action:manipulation; }
@@ -129,7 +136,7 @@ document.addEventListener('pointerdown', unlockAudio, true); document.addEventLi
 function play(id) { try { audio.pause(); audio.src = 'jp/audio/' + id + '.mp3'; audio.currentTime = 0; audio.play().catch(() => {}); } catch (e) {} }
 
 // ---------- 題庫 ----------
-let D = null, ITEMS = {}, BYL = {};
+let D = null, ITEMS = {}, BYL = {}, GL = {};
 const SOON = ['', '', '', '', '去哪裡、怎麼去（へ・で）', '每天做什麼（を・動詞變化・副詞）', '形容詞、想要～（たい）', '有、在、喜歡（が・あります・います）', '給、收到（あげます・もらいます）', '數東西（量詞）', '昨天、以前（過去式）', '比較（より・ほど・いちばん）', '動詞的應用（提議、一邊～一邊～）'];
 const NOSPLIT = ['この', 'その', 'あの', 'どの', 'いっしょに', 'すみません', 'ちがいます', 'ください', 'よろしく', 'はじめまして', 'ありません', 'ちょっと…'];
 function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾的 です/ます 和助詞切開
@@ -148,11 +155,17 @@ function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾�
 }
 function loadData(d) {
   D = d;
+  // 拆解用的字典：助詞和固定說法、單字（漢字和讀音）、動詞去掉 ます 的部分
+  d.lessons.forEach(L => L.words.forEach(w => { GL[w.k] = GL[w.k] || w.zh; GL[w.r] = GL[w.r] || w.zh; if (w.k.endsWith('ます')) GL[w.k.slice(0, -2)] = w.zh.replace(/（.*）/, ''); }));
+  Object.assign(GL, d.gloss || {});
   d.lessons.forEach(L => {
     BYL[L.no] = L; L.items = [];
     L.words.forEach(w => { const it = Object.assign({ kind: 'w', L: L.no }, w); ITEMS[w.id] = it; L.items.push(it); });
     L.sents.forEach(s => { const it = Object.assign({ kind: 's', L: L.no }, s); it.chips = chipsOf(s.jp); ITEMS[s.id] = it; L.items.push(it); });
   });
+}
+function breakdown(it) {   // 句子拆成詞卡，每塊下面寫意思；有說明的再加 💡
+  return '<div class="brk">' + it.chips.map(c => '<span><b class="jp">' + ruby(c) + '</b><small>' + esc(GL[plain(c)] || '') + '</small></span>').join('') + '</div>' + (it.note ? '<div class="note">💡 ' + esc(it.note) + '</div>' : '');
 }
 const hasKanji = (s) => /[一-鿿]/.test(s);
 function typesOf(it) {
@@ -263,7 +276,7 @@ function learn(L) {
   let h = '<div class="top"><a href="#">← 課程列表</a><span class="muted">第 ' + L.no + ' 課・重點</span></div><h1>' + esc(L.title) + '</h1>';
   L.goals.forEach(g => {
     h += '<div class="card"><h2>學習目標 ' + g.no + '</h2><h3>' + esc(g.title) + '</h3><div class="pat jp">' + ruby(g.pattern) + '</div><p style="margin:6px 0">' + esc(g.explain) + '</p>';
-    L.sents.filter(s => s.g === g.no).forEach(s => { h += '<div class="ex"><button class="play" data-a="' + s.id + '">▶</button><span class="s jp">' + ruby(s.jp) + '</span><span class="z">' + esc(s.zh) + '</span></div>'; });
+    L.sents.filter(s => s.g === g.no).forEach(s => { h += '<div class="ex"><button class="play" data-a="' + s.id + '">▶</button><span class="s jp">' + ruby(s.jp) + '</span><span class="z">' + esc(s.zh) + '</span><button class="zb" data-z="' + s.id + '">🔍 拆解</button><div class="brkw" id="z-' + s.id + '" hidden>' + breakdown(ITEMS[s.id]) + '</div></div>'; });
     if (L.lab && L.lab.goal === g.no) h += '<button class="ghost" style="width:100%;margin-top:8px" onclick="location.hash=\'lab/' + L.lab.id + '\'">🎮 ' + esc(L.lab.title) + '</button>';
     h += '</div>';
   });
@@ -271,6 +284,7 @@ function learn(L) {
     '<div class="row2"><button class="big" onclick="location.hash=\'P/' + L.no + '\'">✏️ 開始練習</button><button class="ghost" onclick="location.hash=\'T/' + L.no + '\'">⚡ 通過測驗</button></div>';
   app.innerHTML = h;
   app.querySelectorAll('[data-a]').forEach(b => b.onclick = () => play(b.dataset.a));
+  app.querySelectorAll('[data-z]').forEach(b => b.onclick = () => { const el = document.getElementById('z-' + b.dataset.z); el.hidden = !el.hidden; b.textContent = el.hidden ? '🔍 拆解' : '▲ 收起'; });
 }
 
 // ---------- 出題 ----------
@@ -319,15 +333,15 @@ function quiz(mode, L) {
   const header = () => '<div class="top"><a href="' + back + '">← ' + (L ? '第 ' + L.no + ' 課' : '課程列表') + '</a><span class="muted">' + title + '</span></div>' +
     '<div class="hud"><span>' + (i + 1) + ' / ' + qs.length + '</span><span>答對 ' + score + '</span></div><div class="bar"><i style="width:' + i / qs.length * 100 + '%;background:var(--blue)"></i></div>';
   const full = (it) => it.kind === 'w' ? '<span class="jp" style="font-size:26px">' + (it.pic ? it.pic + ' ' : '') + esc(it.k) + '</span>' + (it.k !== it.r ? '<span class="jp">（' + esc(it.r) + '）</span>' : '') + ' ＝ ' + esc(it.zh)
-    : '<div class="ans jp">' + ruby(it.jp) + '</div><div>' + esc(it.zh) + '</div>';
-  const goalTip = (it) => { if (it.kind !== 's') return ''; const g = BYL[it.L].goals.find(g => g.no === it.g); return g ? '<div class="muted" style="margin-top:6px">句型：<span class="jp">' + ruby(g.pattern) + '</span>（第 ' + it.L + ' 課・' + esc(g.title) + '）</div>' : ''; };
+    : '<div class="ans jp">' + ruby(it.jp) + '</div><div>' + esc(it.zh) + '</div>' + breakdown(it);
+  const goalTip = (it) => { if (it.kind !== 's' || it.phrase) return ''; const g = BYL[it.L].goals.find(g => g.no === it.g); return g ? '<div class="muted" style="margin-top:6px">句型：<span class="jp">' + ruby(g.pattern) + '</span>（第 ' + it.L + ' 課・' + esc(g.title) + '）</div>' : ''; };
   function show() {
     if (i >= qs.length) return end();
     const q0 = qs[i], it = q0.it;
     if (q0.intro) {
       app.innerHTML = header() + '<div class="card" style="text-align:center"><p class="muted" style="margin:0">' + (it.kind === 'w' ? '新的單字 ✨' : '新的句子 ✨') + '</p>' +
         (it.kind === 'w' ? '<div class="qpic">' + (it.pic || '') + '</div><div class="qk jp">' + esc(it.k) + '</div>' + (it.k !== it.r ? '<div class="jp" style="font-size:22px">' + esc(it.r) + '</div>' : '') + '<p style="font-size:20px;margin:6px 0">' + esc(it.zh) + '</p>'
-          : '<div class="qs jp">' + ruby(it.jp) + '</div><p style="font-size:18px;margin:4px 0">' + esc(it.zh) + '</p>' + goalTip(it)) +
+          : '<div class="qs jp">' + ruby(it.jp) + '</div><p style="font-size:18px;margin:4px 0">' + esc(it.zh) + '</p>' + breakdown(it) + goalTip(it)) +
         '<div class="next"><button class="ghost" id="ag">🔊 再聽一次</button><button class="big" style="width:auto;padding:12px 26px" id="go">記住了 →</button></div></div>';
       play(it.id); app.querySelector('#ag').onclick = () => play(it.id);
       app.querySelector('#go').onclick = () => { q0.intro = false; show(); };
