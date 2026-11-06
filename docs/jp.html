@@ -133,7 +133,16 @@ const audio = new Audio(), SILENT = 'silent.mp3';
 let audioOK = false;
 function unlockAudio() { if (audioOK) return; audioOK = true; try { audio.src = SILENT; audio.play().catch(() => { audioOK = false; }); } catch (e) { audioOK = false; } }
 document.addEventListener('pointerdown', unlockAudio, true); document.addEventListener('touchend', unlockAudio, true);
-function play(id) { try { audio.pause(); audio.src = 'jp/audio/' + id + '.mp3'; audio.currentTime = 0; audio.play().catch(() => {}); } catch (e) {} }
+// 每回合開始先把語音下載好（BLOB），答完才不會等下載；play 回傳「念完了」（最多等 3 秒）
+const BLOB = {};
+function preload(ids) { ids.forEach(id => { if (BLOB[id]) return; BLOB[id] = 'jp/audio/' + id + '.mp3';
+  fetch(BLOB[id]).then(r => r.ok ? r.blob() : null).then(b => { if (b) BLOB[id] = URL.createObjectURL(b); }).catch(() => {}); }); }
+function play(id) {
+  return new Promise(done => {
+    const t = setTimeout(done, 3000), fin = () => { clearTimeout(t); audio.onended = audio.onerror = null; done(); };
+    try { audio.pause(); audio.onended = audio.onerror = fin; audio.src = BLOB[id] || ('jp/audio/' + id + '.mp3'); audio.currentTime = 0; audio.play().catch(fin); } catch (e) { fin(); }
+  });
+}
 
 // ---------- 題庫 ----------
 let D = null, ITEMS = {}, BYL = {}, GL = {};
@@ -326,6 +335,7 @@ function makeQ(it, type) {
 
 function quiz(mode, L) {
   const qs = buildRound(mode, L);
+  preload(qs.map(q => q.it.id));
   const back = L ? '#L/' + L.no : '#';
   if (!qs.length) { app.innerHTML = '<div class="top"><a href="#">← 課程列表</a></div><div class="card">' + (mode === 'fix' ? '錯題本是空的 🎉' : '還沒有練過的題目，先去練一課吧。') + '</div>'; return; }
   const title = mode === 'pass' ? '⚡ 通過測驗' : mode === 'mix' ? '🔁 綜合複習' : mode === 'fix' ? '📒 錯題本' : '✏️ 練習';
@@ -337,6 +347,7 @@ function quiz(mode, L) {
   const goalTip = (it) => { if (it.kind !== 's' || it.phrase) return ''; const g = BYL[it.L].goals.find(g => g.no === it.g); return g ? '<div class="muted" style="margin-top:6px">句型：<span class="jp">' + ruby(g.pattern) + '</span>（第 ' + it.L + ' 課・' + esc(g.title) + '）</div>' : ''; };
   function show() {
     if (i >= qs.length) return end();
+    audio.pause();
     const q0 = qs[i], it = q0.it;
     if (q0.intro) {
       app.innerHTML = header() + '<div class="card" style="text-align:center"><p class="muted" style="margin:0">' + (it.kind === 'w' ? '新的單字 ✨' : '新的句子 ✨') + '</p>' +
@@ -374,8 +385,10 @@ function quiz(mode, L) {
       record(it, q.type, a, ad, ok, ms, mode);
       if (ok) score++; else wrongs.push(it);
       const fb = app.querySelector('#fb'), idk = app.querySelector('#idk'); if (idk) idk.disabled = true;
-      play(it.id);
-      if (ok && q.type !== 'order' && q.type !== 'fill' && q.type !== 'listen') { fb.className = 'fb ok'; fb.innerHTML = '⭕ ' + full(it); setTimeout(() => { i++; show(); }, q0.test ? 700 : 1300); return; }
+      const said = play(it.id);
+      if (ok && q.type !== 'order' && q.type !== 'fill' && q.type !== 'listen') {   // 答對：等語音念完（而且至少停一下）才下一題
+        fb.className = 'fb ok'; fb.innerHTML = '⭕ ' + full(it); const me = i;
+        Promise.all([said, new Promise(r => setTimeout(r, q0.test ? 600 : 1000))]).then(() => { if (i === me) { i++; show(); } }); return; }
       fb.className = 'fb ' + (ok ? 'ok' : 'no');
       fb.innerHTML = (ok ? '⭕ 答對了' : '❌ ' + (a == null ? '沒關係，記下來' : '正確答案')) + '<div style="margin-top:6px">' + full(it) + '</div>' + (ok ? '' : goalTip(it)) +
         '<div class="next"><button class="ghost" id="rep">🔊 再聽</button><button class="big" style="width:auto;padding:10px 24px" id="nx">下一題 →</button></div>';

@@ -176,7 +176,16 @@ const audio = new Audio();
 let audioOK = false;
 function unlockAudio() { if (audioOK) return; audioOK = true; try { audio.src = 'silent.mp3'; audio.play().catch(() => { audioOK = false; }); } catch (e) { audioOK = false; } }
 document.addEventListener('pointerdown', unlockAudio, true); document.addEventListener('touchend', unlockAudio, true);
-function play(c) { try { audio.pause(); audio.src = 'kana/' + c.snd + '.mp3'; audio.currentTime = 0; audio.play().catch(() => {}); } catch (e) {} }
+// 先下載好的語音（BLOB）；play 回傳「念完了」（最多等 2.5 秒）
+const BLOB = {};
+function preload(cs) { cs.forEach(c => { const u = 'kana/' + c.snd + '.mp3'; if (BLOB[c.snd]) return; BLOB[c.snd] = u;
+  fetch(u).then(r => r.ok ? r.blob() : null).then(b => { if (b) BLOB[c.snd] = URL.createObjectURL(b); }).catch(() => {}); }); }
+function play(c) {
+  return new Promise(done => {
+    const t = setTimeout(done, 2500), fin = () => { clearTimeout(t); audio.onended = audio.onerror = null; done(); };
+    try { audio.pause(); audio.onended = audio.onerror = fin; audio.src = BLOB[c.snd] || ('kana/' + c.snd + '.mp3'); audio.currentTime = 0; audio.play().catch(fin); } catch (e) { fin(); }
+  });
+}
 
 // ---------- 畫面 ----------
 const app = document.getElementById('app');
@@ -272,6 +281,7 @@ function buildRound(mode) {
 function practice(mode) {
   const qs = buildRound(mode);
   if (!qs.length) { location.hash = ''; return; }
+  preload(qs.flatMap(q => [q.c].concat(ALLC.filter(cOpen).slice(0, 60))));
   const title = mode === 'test' ? '⚡ 快速檢測' : mode === 'review' ? '📒 錯題複習' : '練習';
   let i = 0, score = 0, wrongs = [];
   const pool = ALLC.filter(cOpen);
@@ -308,7 +318,7 @@ function practice(mode) {
       if (ok) score++; else wrongs.push({ c, o });
       const fb = app.querySelector('#fb');
       if (q.type !== 'hear' || !ok) play(c);
-      if (ok) { fb.className = 'fb ok'; fb.innerHTML = '⭕ <span class="jp">' + K(c.h) + '</span> = ' + showR(c) + (ms > 6000 && !q0.test ? '<br><span class="muted">對了，但想比較久，之後會再出</span>' : ''); setTimeout(() => { i++; show(); }, q0.test ? 450 : 1000); }
+      if (ok) { fb.className = 'fb ok'; fb.innerHTML = '⭕ <span class="jp">' + K(c.h) + '</span> = ' + showR(c) + (ms > 6000 && !q0.test ? '<br><span class="muted">對了，但想比較久，之後會再出</span>' : ''); setTimeout(() => { i++; show(); }, q0.test ? 900 : 1100); }   // 語音已先下載，0.9 秒剛好念完一個音
       else {
         fb.className = 'fb no';
         fb.innerHTML = '❌ 答案是 <b class="jp">' + K(c.h) + '</b>（' + showR(c) + '）' + (o ? '<br>你選的 <span class="jp">' + K(o.h) + '</span> 是 ' + showR(o) : '') + memoHTML(c, true) +
