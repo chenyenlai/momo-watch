@@ -46,7 +46,7 @@ button:disabled { opacity:.5; cursor:default; }
 .goals { display:flex; flex-wrap:wrap; gap:4px; }
 .goals span { font-size:12px; background:var(--soft); border:1px solid var(--line); border-radius:6px; padding:1px 6px; color:var(--muted); }
 /* 重點頁 */
-.pat { background:var(--pick); border-radius:10px; padding:8px 12px; font-size:20px; margin:6px 0; }
+.pat { background:var(--pick); border-radius:10px; padding:8px 12px; font-size:20px; margin:6px 0; white-space:pre-line; }
 .ex { display:grid; grid-template-columns:auto 1fr; gap:4px 10px; align-items:center; padding:7px 0; border-top:1px solid var(--line); }
 .ex .s { font-size:19px; line-height:1.9; }
 .ex .z { grid-column:2; font-size:14px; color:var(--muted); margin-top:-4px; }
@@ -145,17 +145,19 @@ function play(id) {
 }
 
 // ---------- 題庫 ----------
-let D = null, ITEMS = {}, BYL = {}, GL = {};
+let D = null, ITEMS = {}, BYL = {}, GL = {}, VSTEM = new Set();
 const SOON = ['', '', '', '', '去哪裡、怎麼去（へ・で）', '每天做什麼（を・動詞變化・副詞）', '形容詞、想要～（たい）', '有、在、喜歡（が・あります・います）', '給、收到（あげます・もらいます）', '數東西（量詞）', '昨天、以前（過去式）', '比較（より・ほど・いちばん）', '動詞的應用（提議、一邊～一邊～）'];
-const NOSPLIT = ['この', 'その', 'あの', 'どの', 'いっしょに', 'すみません', 'ちがいます', 'ください', 'よろしく', 'はじめまして', 'ありません', 'ちょっと…'];
+const NOSPLIT = ['この', 'その', 'あの', 'どの', 'いっしょに', 'すみません', 'ちがいます', 'ください', 'よろしく', 'はじめまして', 'ありません', 'ちょっと…', 'いつも', 'とても'];
 function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾的 です/ます 和助詞切開
   const body = jp.replace(/[。？！]$/, '');
   const out = [];
   body.split(/[ 、。]/).filter(Boolean).forEach(ch => {
     if (NOSPLIT.includes(plain(ch))) { out.push(ch); return; }
     const tail = []; let rest = ch;
-    const suf = ['ませんか', 'ましょう', 'ますか', 'ですか', 'ですね', 'ません', 'です', 'ます'].find(x => rest.endsWith(x) && plain(rest).length > x.length);
+    const suf = ['ませんでした', 'ませんか', 'ましょう', 'ましたか', 'ました', 'ますか', 'ですか', 'ですね', 'ません', 'です', 'ます'].find(x => rest.endsWith(x) && plain(rest).length > x.length);
     if (suf) { tail.unshift(suf); rest = rest.slice(0, -suf.length); }
+    const tai = ['たくない', 'たい'].find(x => rest.endsWith(x) && VSTEM.has(plain(rest.slice(0, -x.length))));   // 食べ｜たい
+    if (tai) { tail.unshift(tai); rest = rest.slice(0, -tai.length); }
     const pt = ['では', 'じゃ', 'は', 'を', 'に', 'で', 'と', 'の', 'が', 'へ', 'も'].find(x => rest.endsWith(x) && plain(rest).length > x.length);
     if (pt) { tail.unshift(pt); rest = rest.slice(0, -pt.length); }
     out.push(rest, ...tail);
@@ -165,7 +167,7 @@ function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾�
 function loadData(d) {
   D = d;
   // 拆解用的字典：助詞和固定說法、單字（漢字和讀音）、動詞去掉 ます 的部分
-  d.lessons.forEach(L => L.words.forEach(w => { GL[w.k] = GL[w.k] || w.zh; GL[w.r] = GL[w.r] || w.zh; if (w.k.endsWith('ます')) GL[w.k.slice(0, -2)] = w.zh.replace(/（.*）/, ''); }));
+  d.lessons.forEach(L => L.words.forEach(w => { GL[w.k] = GL[w.k] || w.zh; GL[w.r] = GL[w.r] || w.zh; if (w.k.endsWith('ます')) { VSTEM.add(w.k.slice(0, -2)); GL[w.k.slice(0, -2)] = w.zh.replace(/（.*）/, ''); } }));
   Object.assign(GL, d.gloss || {});
   d.lessons.forEach(L => {
     BYL[L.no] = L; L.items = [];
@@ -420,7 +422,7 @@ function quiz(mode, L) {
     if (mode === 'pass') {
       const ok = score >= Math.ceil(qs.length * 0.8);
       if (ok) { S.pass[L.no] = Date.now(); save(); }
-      extra = ok ? '<p style="font-size:18px">✅ 第 ' + L.no + ' 課通過！這課不用重看影片，之後會在綜合複習裡偶爾出現。</p>'
+      extra = ok ? '<p style="font-size:18px">✅ 第 ' + L.no + ' 課通過！這課不用再回出口仁 App 重看了，之後會在綜合複習裡偶爾出現。</p>'
         : '<p>還差一點（要答對 ' + Math.ceil(qs.length * 0.8) + ' 題）。建議先看「📖 重點」或 App 這課的影片，再「✏️ 練習」幾回合。</p>';
     }
     const ws = [...new Set(wrongs)];
