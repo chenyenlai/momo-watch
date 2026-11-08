@@ -216,10 +216,20 @@ function shopHTML(it) {
 function render(note) {
   const st = document.getElementById('status')
   st.className = 'status'
-  const at = DATA_NOW ? (() => { const t = tw(DATA_NOW.ts * 1000); return `${t.m}/${t.d} ${t.hh}:${t.mm}` })() : ''
   if (busy) st.innerHTML = `<span class="spin"></span>請 NAS 查詢中…（約 15 秒）`
   else if (note) { st.textContent = note; st.className = 'status warn' }
-  else st.textContent = DATA_NOW ? `資料時間 ${at}` : ''
+  else if (DATA_NOW) {
+    // MOMO、官網各自最後一次成功抓到的時間；抓不到時 NAS 沿用上次的資料（舊格式沒有這兩欄，就用 ts）
+    const fmt = s => { const t = tw(s * 1000); return `${t.m}/${t.d} ${t.hh}:${t.mm}` }
+    const momoTs = 'momoTs' in DATA_NOW ? DATA_NOW.momoTs : DATA_NOW.ts
+    const shopTs = 'shopTs' in DATA_NOW ? DATA_NOW.shopTs : DATA_NOW.ts
+    const times = `最後抓取　MOMO ${momoTs ? fmt(momoTs) : '還沒抓到過（只列即將開賣，庫存未知）'}・FUNBOX 官網 ${shopTs ? fmt(shopTs) : '還沒抓到過'}`
+    if (DATA_NOW.momoBlocked) {
+      st.innerHTML = `⚠️ MOMO 從 ${fmt(DATA_NOW.momoBlocked.since)} 起暫時擋連線${momoTs ? '，MOMO 商品是上次抓到的資料' : ''}<br>${esc(times)}`
+      st.className = 'status warn'
+    } else st.textContent = times
+  }
+  else st.textContent = ''
   if (!DATA_NOW) {
     document.getElementById('days').innerHTML = `<div class="empty">${busy ? '查詢中…' : '按「更新」取得最新開賣資訊'}</div>`
     return
