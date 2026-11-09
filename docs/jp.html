@@ -126,7 +126,7 @@ const app = document.getElementById('app');
 const esc = (s) => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 const R = { pick: a => a[Math.floor(Math.random() * a.length)], shuffle: a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; } };
 // 漢字[讀音] → 上方小字；plain 是去掉讀音的文字
-const ruby = (s) => esc(s).replace(/([0-9々一-鿿]+)\[([^\]]+)\]/g, (m, b, r) => S.furi ? '<ruby>' + b + '<rt>' + r + '</rt></ruby>' : b);
+const ruby = (s) => esc(s).replace(/([0-9々一-鿿]+)\[([^\]]+)\]/g, (m, b, r) => S.furi || /^[0-9]+$/.test(b) ? '<ruby>' + b + '<rt>' + r + '</rt></ruby>' : b);   // 數字的念法一律顯示
 const plain = (s) => s.replace(/\[[^\]]*\]/g, '');
 // iPhone Safari：只有手指點下去時才能開始播放；所以第一次點畫面就用同一個播放器先播一段無聲，之後自動播放才不會被擋
 const audio = new Audio(), SILENT = 'silent.mp3';
@@ -146,6 +146,9 @@ function play(id) {
 
 // ---------- 題庫 ----------
 let D = null, ITEMS = {}, BYL = {}, GL = {}, VSTEM = new Set();
+const ORD = (no) => typeof no === 'number' ? no : 100 + parseInt(String(no).slice(1));   // 旅遊包排在課本後面（出選項時可以用到全部課本的字）
+const LN = (L) => typeof L.no === 'number' ? '第 ' + L.no + ' 課' : L.short;
+const PACK_SOON = [['②', '時間・星期・日期', '🚃 車站、🏨 飯店'], ['③', '量詞：ひとつ、〜人、〜枚、〜本', '🍜 餐廳點餐'], ['⑨', '機場、緊急', '✈️ 🆘']];
 const SOON = ['', '', '', '', '去哪裡、怎麼去（へ・で）', '每天做什麼（を・動詞變化・副詞）', '形容詞、想要～（たい）', '有、在、喜歡（が・あります・います）', '給、收到（あげます・もらいます）', '數東西（量詞）', '昨天、以前（過去式）', '比較（より・ほど・いちばん）', '動詞的應用（提議、一邊～一邊～）'];
 const NOSPLIT = ['この', 'その', 'あの', 'どの', 'いっしょに', 'すみません', 'ちがいます', 'ください', 'よろしく', 'はじめまして', 'ありません', 'ちょっと…', 'いつも', 'とても'];
 function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾的 です/ます 和助詞切開
@@ -176,10 +179,12 @@ function loadData(d) {
   });
 }
 function breakdown(it) {   // 句子拆成詞卡，每塊下面寫意思；有說明的再加 💡
-  return '<div class="brk">' + it.chips.map(c => '<span><b class="jp">' + ruby(c) + '</b><small>' + esc((it.gl || {})[plain(c)] || GL[plain(c)] || '') + '</small></span>').join('') + '</div>' + (it.note ? '<div class="note">💡 ' + esc(it.note) + '</div>' : '');
+  const gl = (c) => (it.gl || {})[c] || GL[c] || (/^[0-9]+円$/.test(c) ? c.slice(0, -1) + ' 日圓' : '');
+  return '<div class="brk">' + it.chips.map(c => '<span><b class="jp">' + ruby(c) + '</b><small>' + esc(gl(plain(c))) + '</small></span>').join('') + '</div>' + (it.note ? '<div class="note">💡 ' + esc(it.note) + '</div>' : '');
 }
 const hasKanji = (s) => /[一-鿿]/.test(s);
 function typesOf(it) {
+  if (it.kind === 'w' && it.num) return ['read', 'hear'];   // 數字：看數字選念法、聽念法選數字
   if (it.kind === 'w') return [it.pic ? 'pic' : null, hasKanji(it.k) ? 'read' : null, 'mean', 'hear'].filter(Boolean);
   return [it.blank ? 'fill' : null, it.chips.length >= 3 ? 'order' : null, 'listen'].filter(Boolean);
 }
@@ -252,6 +257,8 @@ function route() {
   else if (p === 'fix') quiz('fix');
   else if (p === 'lab' && a === 'kosoado') labKosoado();
   else if (p === 'lab' && a === 'clock') labClock();
+  else if (p === 'lab' && a === 'konbini') labKonbini();
+  else if (p === 'V' && BYL[a] && BYL[a].video) watch(BYL[a]);
   else home();
   window.scrollTo(0, 0);
 }
@@ -266,27 +273,33 @@ function home() {
     '<div class="row2"><button class="big" ' + (studied ? '' : 'disabled') + ' onclick="location.hash=\'mix\'">🔁 綜合複習</button><button class="ghost" ' + (fixN ? '' : 'disabled') + ' onclick="location.hash=\'fix\'">📒 錯題本（' + fixN + '）</button></div>' +
     '<p class="muted" style="margin:10px 0 0">今天答了 <b>' + todayN + '</b> 題・練過 <b>' + studied + '</b> / ' + all.length + ' 個單字和句子</p>' +
     '<label class="muted" style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="furi" ' + (S.furi ? 'checked' : '') + '> 漢字上面顯示讀音</label></div>';
-  for (let no = 1; no <= 12; no++) {
-    const L = BYL[no];
-    if (!L) { h += '<div class="card les soon"><div class="hd"><span><span class="no">第 ' + no + ' 課</span><h3>' + esc(SOON[no]) + '</h3></span><span class="badge b0">製作中</span></div></div>'; continue; }
-    const s = lessonStat(L);
+  const card = (L) => {
+    const no = L.no, s = lessonStat(L);
     const badge = s.pass ? '<span class="badge b2">✅ 已通過</span>' : s.seen ? '<span class="badge b1">學習中</span>' : '<span class="badge b0">還沒開始</span>';
-    h += '<div class="card les"><div class="hd"><span><span class="no">第 ' + no + ' 課</span><h3>' + esc(L.title) + '</h3></span>' + badge + '</div>' +
+    return '<div class="card les"><div class="hd"><span><span class="no">' + LN(L) + '</span><h3>' + esc(L.title) + '</h3></span>' + badge + '</div>' +
       '<div class="goals">' + L.goals.map(g => '<span>' + g.no + ' ' + esc(g.title) + '</span>').join('') + '</div>' +
       '<div class="bar"><i style="width:' + s.good / s.n * 100 + '%;background:var(--l4)"></i><i style="width:' + (s.seen - s.good) / s.n * 100 + '%;background:var(--l2)"></i></div>' +
       '<div class="muted">熟練 ' + s.good + ' / ' + s.n + (s.fix ? '・錯題 ' + s.fix : '') + '</div>' +
       '<div class="row3"><button class="ghost" onclick="location.hash=\'L/' + no + '\'">📖 重點</button><button class="ghost" onclick="location.hash=\'P/' + no + '\'">✏️ 練習</button><button class="ghost" onclick="location.hash=\'T/' + no + '\'">⚡ 測驗</button></div>' +
+      (L.video ? '<button class="ghost" onclick="location.hash=\'V/' + no + '\'">📺 影片／🎧 只聽聲音（' + L.video.min + ' 分鐘）</button>' : '') +
       (L.lab ? '<button class="ghost" onclick="location.hash=\'lab/' + L.lab.id + '\'">🎮 ' + esc(L.lab.title) + '</button>' : '') + '</div>';
-  }
+  };
+  const soon = (tag, title, sub) => '<div class="card les soon"><div class="hd"><span><span class="no">' + tag + '</span><h3>' + esc(title) + '</h3>' + (sub ? '<span class="muted">' + esc(sub) + '</span>' : '') + '</span><span class="badge b0">製作中</span></div></div>';
+  h += '<h2 style="margin:18px 0 0">🧳 旅遊包：旅遊用得到的字和句子</h2>';
+  D.lessons.filter(L => typeof L.no !== 'number').forEach(L => { h += card(L); });
+  PACK_SOON.forEach(([n, t, sub]) => { h += soon('旅遊包 ' + n, t, sub); });
+  h += '<h2 style="margin:18px 0 0">📘 課本初級 12 課</h2>';
+  for (let no = 1; no <= 12; no++) h += BYL[no] ? card(BYL[no]) : soon('第 ' + no + ' 課', SOON[no]);
   h += '<p class="muted">單字、例句和說明是自己整理的，課次對應 App 的內容但不完全一樣。紀錄同步到 Google 試算表。</p>';
   app.innerHTML = h;
   app.querySelector('#furi').onchange = (e) => { S.furi = e.target.checked; save(); };
 }
 
 function learn(L) {
-  let h = '<div class="top"><a href="#">← 課程列表</a><span class="muted">第 ' + L.no + ' 課・重點</span></div><h1>' + esc(L.title) + '</h1>';
+  let h = '<div class="top"><a href="#">← 課程列表</a><span class="muted">' + LN(L) + '・重點</span></div><h1>' + esc(L.title) + '</h1>' +
+    (L.video ? '<button class="ghost" style="width:100%;margin-bottom:12px" onclick="location.hash=\'V/' + L.no + '\'">📺 影片／🎧 只聽聲音（' + L.video.min + ' 分鐘）</button>' : '');
   L.goals.forEach(g => {
-    h += '<div class="card"><h2>學習目標 ' + g.no + '</h2><h3>' + esc(g.title) + '</h3><div class="pat jp">' + ruby(g.pattern) + '</div><p style="margin:6px 0">' + esc(g.explain) + '</p>';
+    h += '<div class="card"><h2>' + (typeof L.no === 'number' ? '學習目標 ' + g.no : '重點 ' + '①②③④⑤⑥'[g.no - 1]) + '</h2><h3>' + esc(g.title) + '</h3><div class="pat jp">' + ruby(g.pattern) + '</div><p style="margin:6px 0">' + esc(g.explain) + '</p>';
     L.sents.filter(s => s.g === g.no).forEach(s => { h += '<div class="ex"><button class="play" data-a="' + s.id + '">▶</button><span class="s jp">' + ruby(s.jp) + '</span><span class="z">' + esc(s.zh) + '</span><button class="zb" data-z="' + s.id + '">🔍 拆解</button><div class="brkw" id="z-' + s.id + '" hidden>' + breakdown(ITEMS[s.id]) + '</div></div>'; });
     if (L.lab && L.lab.goal === g.no) h += '<button class="ghost" style="width:100%;margin-top:8px" onclick="location.hash=\'lab/' + L.lab.id + '\'">🎮 ' + esc(L.lab.title) + '</button>';
     h += '</div>';
@@ -296,6 +309,23 @@ function learn(L) {
   app.innerHTML = h;
   app.querySelectorAll('[data-a]').forEach(b => b.onclick = () => play(b.dataset.a));
   app.querySelectorAll('[data-z]').forEach(b => b.onclick = () => { const el = document.getElementById('z-' + b.dataset.z); el.hidden = !el.hidden; b.textContent = el.hidden ? '🔍 拆解' : '▲ 收起'; });
+}
+
+// ---------- 影片／只聽聲音 ----------
+// iPhone：網頁影片在鎖螢幕、切 App 時會停；只聽聲音的 mp3 用 <audio> 播，鎖螢幕也會繼續，車上藍牙可以控制
+function watch(L) {
+  const v = L.video, K = 'cy-jp-pos-' + L.no;
+  app.innerHTML = '<div class="top"><a href="#L/' + L.no + '">← ' + esc(LN(L)) + '</a><span class="muted">📺 影片</span></div><h1>' + esc(L.title) + '</h1>' +
+    '<div class="card"><h2>📺 看影片（散步、在家）</h2><video id="vd" src="jp/' + v.mp4 + '" controls playsinline preload="metadata" style="width:100%;border-radius:10px;background:#000"></video></div>' +
+    '<div class="card" style="margin-top:12px"><h2>🎧 只聽聲音（開車、鎖螢幕）</h2><audio id="au" src="jp/' + v.mp3 + '" controls preload="none" style="width:100%"></audio>' +
+    '<p class="muted" style="margin:8px 0 0">內容和影片一樣。鎖住螢幕也會繼續播，可以用車上的藍牙／CarPlay 暫停、播放。聽到停頓的時候，自己開口說。</p></div>' +
+    '<div class="card" style="margin-top:12px"><h2>這集的內容</h2><ol style="margin:0;padding-left:22px">' + v.parts.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol></div>';
+  // 記住聽到哪裡（兩個播放器共用）
+  let pos = 0; try { pos = +localStorage.getItem(K) || 0; } catch (e) {}
+  ['vd', 'au'].forEach(id => { const m = document.getElementById(id);
+    m.addEventListener('loadedmetadata', () => { if (pos > 5 && pos < m.duration - 10) m.currentTime = pos; });
+    m.addEventListener('timeupdate', () => { try { localStorage.setItem(K, String(Math.floor(m.currentTime))); } catch (e) {} });
+    m.addEventListener('play', () => { audio.pause(); ['vd', 'au'].filter(x => x !== id).forEach(x => document.getElementById(x).pause()); }); });
 }
 
 // ---------- 出題 ----------
@@ -319,17 +349,17 @@ function buildRound(mode, L) {
   return out;
 }
 function makeQ(it, type) {
-  const L = BYL[it.L], same = (k) => L.items.filter(i => i.kind === k && i.id !== it.id), others = (k) => Object.values(ITEMS).filter(i => i.kind === k && i.id !== it.id && i.L <= it.L);
+  const L = BYL[it.L], same = (k) => L.items.filter(i => i.kind === k && i.id !== it.id), others = (k) => Object.values(ITEMS).filter(i => i.kind === k && i.id !== it.id && ORD(i.L) <= ORD(it.L));
   const take = (arr, f, n) => { const seen = new Set([f(it)]), out = []; R.shuffle(arr).forEach(x => { const v = f(x); if (!seen.has(v) && out.length < n) { seen.add(v); out.push(x); } }); return out; };
   const fill3 = (k, f, need) => { let o = take(same(k).filter(need || (() => true)), f, 3); if (o.length < 3) o = o.concat(take(others(k).filter(x => !o.includes(x) && (need || (() => true))(x)), f, 3 - o.length)); return o; };
   let opts;
   if (type === 'read') {
-    const trap = { 'よじ': 'よんじ', 'くじ': 'きゅうじ', 'しちじ': 'ななじ' }[it.r];
-    const o = take(others('w').filter(x => x.r !== it.r && hasKanji(x.k)), x => x.r, trap ? 2 : 3).map(x => x.r);
+    const trap = { 'よじ': 'よんじ', 'くじ': 'きゅうじ', 'しちじ': 'ななじ', 'さんびゃく': 'さんひゃく', 'ろっぴゃく': 'ろくひゃく', 'はっぴゃく': 'はちひゃく', 'さんぜん': 'さんせん', 'はっせん': 'はちせん', 'いちまん': 'じゅうせん', 'ひゃく': 'いちひゃく', 'せん': 'いちせん' }[it.r];
+    const o = take(it.num ? same('w').filter(x => x.num && x.r !== it.r) : others('w').filter(x => x.r !== it.r && hasKanji(x.k)), x => x.r, trap ? 2 : 3).map(x => x.r);
     opts = R.shuffle([it.r].concat(trap ? [trap] : [], o)).map(r => ({ txt: r, ok: r === it.r }));
   } else if (type === 'mean') opts = R.shuffle([it].concat(fill3('w', x => x.zh))).map(x => ({ txt: x.zh, ok: x === it, zh: true }));
   else if (type === 'pic') opts = R.shuffle([it].concat(fill3('w', x => x.k, x => !!x.pic))).map(x => ({ txt: x.k, sub: x.k !== x.r ? x.r : '', ok: x === it }));
-  else if (type === 'hear') opts = R.shuffle([it].concat(fill3('w', x => x.k))).map(x => ({ txt: x.k, ok: x === it, id: x.id }));
+  else if (type === 'hear') opts = R.shuffle([it].concat(fill3('w', x => x.k, it.num ? (x => x.num) : (x => !x.num)))).map(x => ({ txt: x.k, ok: x === it, id: x.id }));
   else if (type === 'listen') opts = R.shuffle([it].concat(fill3('s', x => x.zh))).map(x => ({ txt: x.zh, ok: x === it, zh: true }));
   else if (type === 'fill') opts = R.shuffle([it.blank].concat(it.opts)).map(x => ({ txt: x, ok: x === it.blank, ruby: true }));
   return { it, type, opts };
@@ -342,11 +372,11 @@ function quiz(mode, L) {
   if (!qs.length) { app.innerHTML = '<div class="top"><a href="#">← 課程列表</a></div><div class="card">' + (mode === 'fix' ? '錯題本是空的 🎉' : '還沒有練過的題目，先去練一課吧。') + '</div>'; return; }
   const title = mode === 'pass' ? '⚡ 通過測驗' : mode === 'mix' ? '🔁 綜合複習' : mode === 'fix' ? '📒 錯題本' : '✏️ 練習';
   let i = 0, score = 0, wrongs = [];
-  const header = () => '<div class="top"><a href="' + back + '">← ' + (L ? '第 ' + L.no + ' 課' : '課程列表') + '</a><span class="muted">' + title + '</span></div>' +
+  const header = () => '<div class="top"><a href="' + back + '">← ' + (L ? LN(L) : '課程列表') + '</a><span class="muted">' + title + '</span></div>' +
     '<div class="hud"><span>' + (i + 1) + ' / ' + qs.length + '</span><span>答對 ' + score + '</span></div><div class="bar"><i style="width:' + i / qs.length * 100 + '%;background:var(--blue)"></i></div>';
-  const full = (it) => it.kind === 'w' ? '<span class="jp" style="font-size:26px">' + (it.pic ? it.pic + ' ' : '') + esc(it.k) + '</span>' + (it.k !== it.r ? '<span class="jp">（' + esc(it.r) + '）</span>' : '') + ' ＝ ' + esc(it.zh)
+  const full = (it) => it.kind === 'w' ? '<span class="jp" style="font-size:26px">' + (it.pic ? it.pic + ' ' : '') + esc(it.k) + '</span>' + (it.k !== it.r ? '<span class="jp">（' + esc(it.r) + '）</span>' : '') + (it.num ? '' : ' ＝ ' + esc(it.zh))
     : '<div class="ans jp">' + ruby(it.jp) + '</div><div>' + esc(it.zh) + '</div>' + breakdown(it);
-  const goalTip = (it) => { if (it.kind !== 's' || it.phrase) return ''; const g = BYL[it.L].goals.find(g => g.no === it.g); return g ? '<div class="muted" style="margin-top:6px">句型：<span class="jp">' + ruby(g.pattern) + '</span>（第 ' + it.L + ' 課・' + esc(g.title) + '）</div>' : ''; };
+  const goalTip = (it) => { if (it.kind !== 's' || it.phrase) return ''; const g = BYL[it.L].goals.find(g => g.no === it.g); return g ? '<div class="muted" style="margin-top:6px">句型：<span class="jp">' + ruby(g.pattern) + '</span>（' + LN(BYL[it.L]) + '・' + esc(g.title) + '）</div>' : ''; };
   function show() {
     if (i >= qs.length) return end();
     audio.pause();
@@ -422,11 +452,11 @@ function quiz(mode, L) {
     if (mode === 'pass') {
       const ok = score >= Math.ceil(qs.length * 0.8);
       if (ok) { S.pass[L.no] = Date.now(); save(); }
-      extra = ok ? '<p style="font-size:18px">✅ 第 ' + L.no + ' 課通過！這課不用再回出口仁 App 重看了，之後會在綜合複習裡偶爾出現。</p>'
+      extra = ok ? '<p style="font-size:18px">✅ ' + LN(L) + '通過！' + (typeof L.no === 'number' ? '這課不用再回出口仁 App 重看了，' : '') + '之後會在綜合複習裡偶爾出現。</p>'
         : '<p>還差一點（要答對 ' + Math.ceil(qs.length * 0.8) + ' 題）。建議先看「📖 重點」或 App 這課的影片，再「✏️ 練習」幾回合。</p>';
     }
     const ws = [...new Set(wrongs)];
-    app.innerHTML = '<div class="top"><a href="' + back + '">← ' + (L ? '第 ' + L.no + ' 課' : '課程列表') + '</a></div><div class="card" style="text-align:center"><div style="font-size:46px">' + (score >= qs.length * 0.8 ? '🎉' : '💪') + '</div><h1>答對 ' + score + ' / ' + qs.length + '</h1>' + extra +
+    app.innerHTML = '<div class="top"><a href="' + back + '">← ' + (L ? LN(L) : '課程列表') + '</a></div><div class="card" style="text-align:center"><div style="font-size:46px">' + (score >= qs.length * 0.8 ? '🎉' : '💪') + '</div><h1>答對 ' + score + ' / ' + qs.length + '</h1>' + extra +
       (ws.length ? '<div style="text-align:left;margin-top:10px"><h2>這回合答錯的（已放進錯題本）</h2>' + ws.map(it => '<div style="padding:4px 0;border-top:1px solid var(--line)">' + (it.kind === 'w' ? '<span class="jp">' + esc(it.k) + (it.k !== it.r ? '（' + esc(it.r) + '）' : '') + '</span> ' + esc(it.zh) : '<span class="jp">' + ruby(it.jp) + '</span><br><span class="muted">' + esc(it.zh) + '</span>') + '</div>').join('') + '</div>' : '') +
       '<div class="row2" style="margin-top:14px"><button class="big" id="again">再一回合 ↺</button><button class="ghost" onclick="location.hash=\'\'">課程列表</button></div></div>';
     app.querySelector('#again').onclick = () => quiz(mode === 'pass' && score >= qs.length * 0.8 ? 'lesson' : mode, L);
@@ -484,6 +514,96 @@ function labKosoado() {
   }
   function next() { roll(); target = R.pick(['near', 'mid', 'far']); draw('<span style="font-size:17px">「わたし」要說閃爍的那個' + (mode === 'thing' ? '東西' : '地方') + '，用哪一個？</span>'); }
   draw();
+}
+
+// ---------- 動手玩：便利商店（旅遊包 ①）----------
+// 探索：點東西聽「お茶は 150円です」；找找看：聽單字點東西（有記錄）；多少錢：聽店員說價錢選數字
+function labKonbini() {
+  const P = BYL.T1, YEN = P.yen, SC = P.scene;
+  const spots = SC.map(o => Object.assign({ pic: ITEMS[o.w].pic }, o)).concat([{ key: 'reji', w: 'T1w11', x: 262, y: 168, price: 0, draw: 'reji' }, { key: 'clerk', w: 'T1w12', x: 318, y: 150, price: 0, draw: 'clerk' }]);
+  let mode = 'look', qn = 0, score = 0, ask = null, busy = false, lit = null;
+  const back = '#L/T1';
+  const label = (o) => { const w = ITEMS[o.w]; return '<b style="font-size:24px">' + esc(w.k) + '</b>' + (w.k !== w.r ? '（' + esc(w.r) + '）' : '') + ' <span style="font-size:16px">' + esc(w.zh) + '</span>'; };
+  const priceTxt = (n) => n + '円<span class="muted" style="font-size:15px">（' + esc(YEN[String(n)]) + '）</span>';
+  function svg() {
+    const tags = mode === 'look';
+    let g = '<svg viewBox="0 0 360 260" role="img" aria-label="便利商店" style="color:var(--ink);touch-action:manipulation">' +
+      '<rect x="0" y="0" width="360" height="260" fill="var(--soft)"/>' +
+      '<rect x="110" y="4" width="140" height="22" rx="6" fill="var(--blue)"/><text x="180" y="20" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">コンビニ</text>' +
+      // 左邊的架子、右邊的冰箱
+      '<rect x="8" y="30" width="152" height="116" rx="6" fill="var(--card)" stroke="var(--line)" stroke-width="2"/><line x1="8" y1="88" x2="160" y2="88" stroke="var(--line)" stroke-width="3"/>' +
+      '<rect x="208" y="30" width="144" height="116" rx="6" fill="var(--near)" stroke="var(--line)" stroke-width="2"/><line x1="208" y1="88" x2="352" y2="88" stroke="var(--line)" stroke-width="3"/><line x1="280" y1="30" x2="280" y2="146" stroke="var(--line)" stroke-width="1.5"/>' +
+      '<text x="344" y="44" text-anchor="end" font-size="10" fill="var(--muted)">冷蔵</text>' +
+      // 櫃台
+      '<rect x="96" y="186" width="260" height="66" rx="8" fill="var(--mid)" stroke="var(--line)" stroke-width="2"/>';
+    spots.forEach(o => {
+      const on = lit === o.key, ring = '<circle cx="' + o.x + '" cy="' + (o.y - 10) + '" r="22" fill="none" stroke="var(--blue)" stroke-width="3" stroke-dasharray="5 4" opacity="' + (on ? 1 : 0) + '"/>';
+      let body;
+      if (o.draw === 'reji') body = '<rect x="' + (o.x - 20) + '" y="' + (o.y - 2) + '" width="40" height="22" rx="4" fill="#5d6878"/><rect x="' + (o.x - 14) + '" y="' + (o.y - 16) + '" width="28" height="15" rx="3" fill="#2b5fd9"/><text x="' + o.x + '" y="' + (o.y - 5) + '" text-anchor="middle" font-size="8" fill="#fff">¥</text>';
+      else if (o.draw === 'clerk') body = '<circle cx="' + o.x + '" cy="' + (o.y - 22) + '" r="15" fill="#f6d2b0"/><path d="M' + (o.x - 15) + ' ' + (o.y - 26) + ' q15 -18 30 0" fill="#3b2a1c"/><rect x="' + (o.x - 18) + '" y="' + (o.y - 6) + '" width="36" height="42" rx="12" fill="#1f8a4c"/><rect x="' + (o.x - 10) + '" y="' + (o.y + 2) + '" width="20" height="8" rx="2" fill="#fff"/>';
+      else body = '<text x="' + o.x + '" y="' + o.y + '" font-size="30" text-anchor="middle">' + o.pic + '</text>';
+      const tag = tags && o.price ? '<rect x="' + (o.x - 18) + '" y="' + (o.y + 5) + '" width="36" height="14" rx="3" fill="#fff59d" stroke="#c9a400"/><text x="' + o.x + '" y="' + (o.y + 16) + '" text-anchor="middle" font-size="10" font-weight="700" fill="#141a24">' + o.price + '円</text>'
+        : (ask && ask.kind === 'price' && ask.o.key === o.key ? '<rect x="' + (o.x - 18) + '" y="' + (o.y + 5) + '" width="36" height="14" rx="3" fill="#fff59d" stroke="#c9a400"/><text x="' + o.x + '" y="' + (o.y + 16) + '" text-anchor="middle" font-size="10" font-weight="700" fill="#141a24">？円</text>' : '');
+      g += '<g class="spot" data-k="' + o.key + '" style="cursor:pointer">' + '<rect x="' + (o.x - 24) + '" y="' + (o.y - 34) + '" width="48" height="56" fill="transparent"/>' + ring + body + tag + '</g>';
+    });
+    return g + '</svg>';
+  }
+  function draw(msg) {
+    app.innerHTML = '<div class="top"><a href="' + back + '">← 旅遊包 ①</a><span class="muted">🎮 動手玩</span></div><h1>便利商店</h1>' +
+      '<div class="seg" style="grid-template-columns:1fr 1fr 1fr"><button data-m="look" class="' + (mode === 'look' ? 'on' : '') + '">👆 探索</button><button data-m="find" class="' + (mode === 'find' ? 'on' : '') + '">🔎 找找看</button><button data-m="price" class="' + (mode === 'price' ? 'on' : '') + '">💴 多少錢</button></div>' +
+      '<div class="card lab">' + svg() + '<div class="say jp" id="say">' + (msg || '') + '</div>' +
+      (ask && ask.kind === 'price' ? '<div class="opts">' + ask.opts.map(n => '<button class="jp" data-p="' + n + '">' + n + '円</button>').join('') + '</div>' : '') +
+      (ask ? '<div style="display:flex;justify-content:center;margin-top:8px"><button class="ghost" id="rep">🔊 再聽一次</button></div>' : '') +
+      (mode !== 'look' && !ask ? '<button class="big" id="go" style="margin-top:8px">' + (mode === 'find' ? '🔎 開始（8 題）' : '💴 開始（6 題）') + '</button>' : '') +
+      (qn ? '<p class="muted" style="text-align:center;margin:8px 0 0">第 ' + qn + ' / ' + (mode === 'find' ? 8 : 6) + ' 題・答對 ' + score + '</p>' : '') +
+      '<p class="muted" style="margin:10px 0 0">' + (mode === 'look' ? '點架子上的東西、收銀台、店員，聽日文怎麼說。價錢牌上 300、600、800 的念法會變音，多點幾次聽聽看。'
+        : mode === 'find' ? '聽到單字，點圖上的那個東西。答錯的字會放進錯題本。' : '店員說價錢，選出正確的數字。注意 300 さんびゃく、600 ろっぴゃく、800 はっぴゃく、3000 さんぜん、8000 はっせん。') + '</p></div>';
+    app.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { audio.pause(); mode = b.dataset.m; ask = null; qn = 0; score = 0; lit = null; busy = false; draw(mode === 'look' ? '<span class="muted" style="font-size:15px">點一點圖上的東西</span>' : ''); });
+    app.querySelectorAll('.spot').forEach(el => el.onclick = () => tap(el.dataset.k));
+    const go = app.querySelector('#go'); if (go) go.onclick = () => { qn = 0; score = 0; next(); };
+    const rep = app.querySelector('#rep'); if (rep) rep.onclick = () => play(ask.clip);
+    app.querySelectorAll('[data-p]').forEach(b => b.onclick = () => answerPrice(+b.dataset.p, b));
+  }
+  function tap(k) {
+    const o = spots.find(x => x.key === k);
+    if (mode === 'look') { lit = k; draw(label(o) + (o.price ? '<br>' + priceTxt(o.price) : '')); play(o.key === 'clerk' ? 'T1s11' : o.price || o.key === 'card' || o.key === 'hashi' ? 'sc-' + o.key : o.w); return; }
+    if (!ask || ask.kind !== 'find' || busy) return;
+    busy = true;
+    const ok = k === ask.o.key, ms = Date.now() - ask.t0;
+    record(ITEMS[ask.o.w], 'scene', ITEMS[o.w].k, ITEMS[o.w].k, ok, ms, 'lab');
+    if (ok) score++;
+    lit = ask.o.key; const said = play(ask.o.w);
+    draw((ok ? '⭕ ' : '❌ 是這個：') + label(ask.o) + (ok ? '' : '<br><span class="muted" style="font-size:15px">你點的是 ' + esc(ITEMS[o.w].k) + '（' + esc(ITEMS[o.w].zh) + '）</span>'));
+    Promise.all([said, new Promise(r => setTimeout(r, ok ? 900 : 2200))]).then(advance);
+  }
+  function answerPrice(n, b) {
+    if (busy) return; busy = true;
+    const ok = n === ask.n; if (ok) score++;
+    app.querySelectorAll('[data-p]').forEach(x => { x.disabled = true; if (+x.dataset.p === ask.n) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
+    app.querySelector('#say').innerHTML = (ok ? '⭕ ' : '❌ ') + priceTxt(ask.n) + (ok ? '' : '<br><span class="muted" style="font-size:15px">' + n + '円 念 ' + esc(YEN[String(n)]) + '</span>');
+    Promise.all([play(ask.clip), new Promise(r => setTimeout(r, ok ? 900 : 2400))]).then(advance);
+  }
+  function advance() {
+    busy = false;
+    if (qn >= (mode === 'find' ? 8 : 6)) { const n = qn; ask = null; lit = null; qn = 0; draw('🎉 ' + n + ' 題答對 ' + score + ' 題' + (score === n ? '，全對！' : '，再玩一次？')); sync(); return; }
+    next();
+  }
+  function next() {
+    qn++;
+    if (mode === 'find') {
+      // 錯過的字先出，其他隨機
+      const pool = R.shuffle(spots.filter(o => !ask || o.key !== ask.o.key)).sort((a, b) => (st(b.w).fix > 0) - (st(a.w).fix > 0));
+      const o = pool[0]; ask = { kind: 'find', o, clip: o.w, t0: Date.now() }; lit = null;
+      draw('<span style="font-size:17px">聽一聽，點出是哪一個</span>'); play(o.w);
+    } else {
+      const o = R.pick(SC.filter(x => x.price >= 100)), n = R.pick(P.prices);
+      const near = P.prices.filter(x => x !== n).sort((a, b) => Math.abs(Math.log(a / n)) - Math.abs(Math.log(b / n))).slice(0, 5);
+      ask = { kind: 'price', o, n, clip: 'yen-' + n, opts: R.shuffle([n].concat(R.shuffle(near).slice(0, 3))) }; lit = o.key;
+      draw('<span style="font-size:17px">' + esc(ITEMS[o.w].k) + ' 多少錢？聽店員說</span>'); play(ask.clip);
+    }
+  }
+  preload(spots.map(o => o.w).concat(SC.map(o => 'sc-' + o.key), ['T1s11']));
+  draw('<span class="muted" style="font-size:15px">點一點圖上的東西</span>');
 }
 
 // ---------- 動手玩：時鐘 ----------
