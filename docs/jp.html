@@ -148,7 +148,7 @@ function play(id) {
 let D = null, ITEMS = {}, BYL = {}, GL = {}, VSTEM = new Set();
 const ORD = (no) => typeof no === 'number' ? no : 100 + parseInt(String(no).slice(1));   // 旅遊包排在課本後面（出選項時可以用到全部課本的字）
 const LN = (L) => typeof L.no === 'number' ? '第 ' + L.no + ' 課' : L.short;
-const PACK_SOON = [['②', '時間・星期・日期', '🚃 車站、🏨 飯店'], ['③', '量詞：ひとつ、〜人、〜枚、〜本', '🍜 餐廳點餐'], ['⑨', '機場、緊急', '✈️ 🆘']];
+const PACK_SOON = [['②', '時間・星期・日期', '🚃 車站時刻、🏨 飯店入住'], ['③', '量詞：ひとつ、〜人、〜枚、〜本', '🍜 餐廳點餐'], ['④', '有、在、位置（上・下・前・後・旁邊）', '⛩️ 問路：トイレは どこに ありますか'], ['⑤', '常用形容詞：顏色、大小、天氣、感覺', '🛍️ 購物'], ['⑥', '人、家人、身體', '🆘 身體不舒服'], ['⑦', '常用動詞（日常生活）', '🏨 飯店、觀光']];
 const SOON = ['', '', '', '', '去哪裡、怎麼去（へ・で）', '每天做什麼（を・動詞變化・副詞）', '形容詞、想要～（たい）', '有、在、喜歡（が・あります・います）', '給、收到（あげます・もらいます）', '數東西（量詞）', '昨天、以前（過去式）', '比較（より・ほど・いちばん）', '動詞的應用（提議、一邊～一邊～）'];
 const NOSPLIT = ['この', 'その', 'あの', 'どの', 'いっしょに', 'すみません', 'ちがいます', 'ください', 'よろしく', 'はじめまして', 'ありません', 'ちょっと…', 'いつも', 'とても'];
 function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾的 です/ます 和助詞切開
@@ -316,9 +316,9 @@ function home() {
       (L.lab ? '<button class="ghost" onclick="location.hash=\'lab/' + L.lab.id + '\'">🎮 ' + esc(L.lab.title) + '</button>' : '') + '</div>';
   };
   const soon = (tag, title, sub) => '<div class="card les soon"><div class="hd"><span><span class="no">' + tag + '</span><h3>' + esc(title) + '</h3>' + (sub ? '<span class="muted">' + esc(sub) + '</span>' : '') + '</span><span class="badge b0">製作中</span></div></div>';
-  h += '<h2 style="margin:18px 0 0">🧳 旅遊包：旅遊用得到的字和句子</h2>';
+  h += '<h2 style="margin:18px 0 0">🧩 主題包：重要的基本字和句子（旅遊用得到的優先）</h2>';
   D.lessons.filter(L => typeof L.no !== 'number').forEach(L => { h += card(L); });
-  PACK_SOON.forEach(([n, t, sub]) => { h += soon('旅遊包 ' + n, t, sub); });
+  PACK_SOON.forEach(([n, t, sub]) => { h += soon('主題包 ' + n, t, sub); });
   h += '<h2 style="margin:18px 0 0">📘 課本初級 12 課</h2>';
   for (let no = 1; no <= 12; no++) h += BYL[no] ? card(BYL[no]) : soon('第 ' + no + ' 課', SOON[no]);
   h += '<p class="muted">單字、例句和說明是自己整理的，課次對應 App 的內容但不完全一樣。紀錄同步到 Google 試算表。</p>';
@@ -584,7 +584,7 @@ function labKonbini() {
     return g + '</svg>';
   }
   function draw(msg) {
-    app.innerHTML = '<div class="top"><a href="' + back + '">← 旅遊包 ①</a><span class="muted">🎮 動手玩</span></div><h1>便利商店</h1>' +
+    app.innerHTML = '<div class="top"><a href="' + back + '">← 主題包 ①</a><span class="muted">🎮 動手玩</span></div><h1>便利商店</h1>' +
       '<div class="seg" style="grid-template-columns:1fr 1fr 1fr"><button data-m="look" class="' + (mode === 'look' ? 'on' : '') + '">👆 探索</button><button data-m="find" class="' + (mode === 'find' ? 'on' : '') + '">🔎 找找看</button><button data-m="price" class="' + (mode === 'price' ? 'on' : '') + '">💴 多少錢</button></div>' +
       '<div class="card lab">' + svg() + '<div class="say jp" id="say">' + (msg || '') + '</div>' +
       (ask && ask.kind === 'price' ? '<div class="opts">' + ask.opts.map(n => '<button class="jp" data-p="' + n + '">' + n + '円</button>').join('') + '</div>' : '') +
