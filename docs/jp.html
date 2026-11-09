@@ -281,7 +281,7 @@ function home() {
       '<div class="bar"><i style="width:' + s.good / s.n * 100 + '%;background:var(--l4)"></i><i style="width:' + (s.seen - s.good) / s.n * 100 + '%;background:var(--l2)"></i></div>' +
       '<div class="muted">熟練 ' + s.good + ' / ' + s.n + (s.fix ? '・錯題 ' + s.fix : '') + '</div>' +
       '<div class="row3"><button class="ghost" onclick="location.hash=\'L/' + no + '\'">📖 重點</button><button class="ghost" onclick="location.hash=\'P/' + no + '\'">✏️ 練習</button><button class="ghost" onclick="location.hash=\'T/' + no + '\'">⚡ 測驗</button></div>' +
-      (L.video ? '<button class="ghost" onclick="location.hash=\'V/' + no + '\'">📺 影片／🎧 只聽聲音（' + L.video.min + ' 分鐘）</button>' : '') +
+      (L.video ? '<button class="ghost" onclick="location.hash=\'V/' + no + '\'">📺 影片／🎧 只聽聲音（' + L.video.length + ' 集，各 3 分鐘）</button>' : '') +
       (L.lab ? '<button class="ghost" onclick="location.hash=\'lab/' + L.lab.id + '\'">🎮 ' + esc(L.lab.title) + '</button>' : '') + '</div>';
   };
   const soon = (tag, title, sub) => '<div class="card les soon"><div class="hd"><span><span class="no">' + tag + '</span><h3>' + esc(title) + '</h3>' + (sub ? '<span class="muted">' + esc(sub) + '</span>' : '') + '</span><span class="badge b0">製作中</span></div></div>';
@@ -297,7 +297,7 @@ function home() {
 
 function learn(L) {
   let h = '<div class="top"><a href="#">← 課程列表</a><span class="muted">' + LN(L) + '・重點</span></div><h1>' + esc(L.title) + '</h1>' +
-    (L.video ? '<button class="ghost" style="width:100%;margin-bottom:12px" onclick="location.hash=\'V/' + L.no + '\'">📺 影片／🎧 只聽聲音（' + L.video.min + ' 分鐘）</button>' : '');
+    (L.video ? '<button class="ghost" style="width:100%;margin-bottom:12px" onclick="location.hash=\'V/' + L.no + '\'">📺 影片／🎧 只聽聲音（' + L.video.length + ' 集，各 3 分鐘）</button>' : '');
   L.goals.forEach(g => {
     h += '<div class="card"><h2>' + (typeof L.no === 'number' ? '學習目標 ' + g.no : '重點 ' + '①②③④⑤⑥'[g.no - 1]) + '</h2><h3>' + esc(g.title) + '</h3><div class="pat jp">' + ruby(g.pattern) + '</div><p style="margin:6px 0">' + esc(g.explain) + '</p>';
     L.sents.filter(s => s.g === g.no).forEach(s => { h += '<div class="ex"><button class="play" data-a="' + s.id + '">▶</button><span class="s jp">' + ruby(s.jp) + '</span><span class="z">' + esc(s.zh) + '</span><button class="zb" data-z="' + s.id + '">🔍 拆解</button><div class="brkw" id="z-' + s.id + '" hidden>' + breakdown(ITEMS[s.id]) + '</div></div>'; });
@@ -314,18 +314,21 @@ function learn(L) {
 // ---------- 影片／只聽聲音 ----------
 // iPhone：網頁影片在鎖螢幕、切 App 時會停；只聽聲音的 mp3 用 <audio> 播，鎖螢幕也會繼續，車上藍牙可以控制
 function watch(L) {
-  const v = L.video, K = 'cy-jp-pos-' + L.no;
-  app.innerHTML = '<div class="top"><a href="#L/' + L.no + '">← ' + esc(LN(L)) + '</a><span class="muted">📺 影片</span></div><h1>' + esc(L.title) + '</h1>' +
-    '<div class="card"><h2>📺 看影片（散步、在家）</h2><video id="vd" src="jp/' + v.mp4 + '" controls playsinline preload="metadata" style="width:100%;border-radius:10px;background:#000"></video></div>' +
-    '<div class="card" style="margin-top:12px"><h2>🎧 只聽聲音（開車、鎖螢幕）</h2><audio id="au" src="jp/' + v.mp3 + '" controls preload="none" style="width:100%"></audio>' +
-    '<p class="muted" style="margin:8px 0 0">內容和影片一樣。鎖住螢幕也會繼續播，可以用車上的藍牙／CarPlay 暫停、播放。聽到停頓的時候，自己開口說。</p></div>' +
-    '<div class="card" style="margin-top:12px"><h2>這集的內容</h2><ol style="margin:0;padding-left:22px">' + v.parts.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol></div>';
-  // 記住聽到哪裡（兩個播放器共用）
-  let pos = 0; try { pos = +localStorage.getItem(K) || 0; } catch (e) {}
-  ['vd', 'au'].forEach(id => { const m = document.getElementById(id);
-    m.addEventListener('loadedmetadata', () => { if (pos > 5 && pos < m.duration - 10) m.currentTime = pos; });
+  const eps = L.video;
+  let h = '<div class="top"><a href="#L/' + L.no + '">← ' + esc(LN(L)) + '</a><span class="muted">📺 影片</span></div><h1>' + esc(L.title) + '</h1>' +
+    '<p class="muted" style="margin-top:-6px">每集約 3 分鐘。📺 看影片：散步、在家。🎧 只聽聲音：開車用，鎖住螢幕也會繼續播，可以用車上的藍牙／CarPlay 暫停。聽到停頓就自己開口說。</p>';
+  eps.forEach((v, k) => {
+    h += '<div class="card" style="margin-top:12px"><h2>' + esc(v.name) + '</h2><div class="muted" style="margin-bottom:8px">' + v.parts.map(esc).join('・') + '</div>' +
+      '<video src="jp/' + v.mp4 + '" controls playsinline preload="metadata" style="width:100%;border-radius:10px;background:#000"></video>' +
+      '<div class="muted" style="margin:10px 0 4px">🎧 只聽聲音</div><audio src="jp/' + v.mp3 + '" controls preload="none" style="width:100%"></audio></div>';
+  });
+  app.innerHTML = h;
+  // 記住每個檔案聽到哪裡；同時只播一個
+  const all = [...app.querySelectorAll('video, audio')];
+  all.forEach(m => { const K = 'cy-jp-pos-' + m.getAttribute('src').split('/').pop();
+    m.addEventListener('loadedmetadata', () => { let pos = 0; try { pos = +localStorage.getItem(K) || 0; } catch (e) {} if (pos > 5 && pos < m.duration - 10) m.currentTime = pos; });
     m.addEventListener('timeupdate', () => { try { localStorage.setItem(K, String(Math.floor(m.currentTime))); } catch (e) {} });
-    m.addEventListener('play', () => { audio.pause(); ['vd', 'au'].filter(x => x !== id).forEach(x => document.getElementById(x).pause()); }); });
+    m.addEventListener('play', () => { audio.pause(); all.filter(x => x !== m).forEach(x => x.pause()); }); });
 }
 
 // ---------- 出題 ----------
