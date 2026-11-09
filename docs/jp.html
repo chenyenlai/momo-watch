@@ -148,7 +148,7 @@ function play(id) {
 let D = null, ITEMS = {}, BYL = {}, GL = {}, VSTEM = new Set();
 const ORD = (no) => typeof no === 'number' ? no : 100 + parseInt(String(no).slice(1));   // 旅遊包排在課本後面（出選項時可以用到全部課本的字）
 const LN = (L) => typeof L.no === 'number' ? '第 ' + L.no + ' 課' : L.short;
-const PACK_SOON = [['②', '時間・星期・日期', '🚃 車站時刻、🏨 飯店入住'], ['③', '量詞：ひとつ、〜人、〜枚、〜本', '🍜 餐廳點餐'], ['④', '有、在、位置（上・下・前・後・旁邊）', '⛩️ 問路：トイレは どこに ありますか'], ['⑤', '常用形容詞：顏色、大小、天氣、感覺', '🛍️ 購物'], ['⑥', '人、家人、身體', '🆘 身體不舒服'], ['⑦', '常用動詞（日常生活）', '🏨 飯店、觀光']];
+const PACK_SOON = [['③', '時間・星期・日期', '🚃 車站時刻、🏨 飯店入住'], ['④', '量詞：ひとつ、〜人、〜枚、〜本', '🍜 餐廳點餐'], ['⑤', '有、在、位置（上・下・前・後・旁邊）', '⛩️ 問路：トイレは どこに ありますか'], ['⑥', '常用形容詞：顏色、大小、天氣、感覺', '🛍️ 購物'], ['⑦', '人、家人、身體', '🆘 身體不舒服'], ['⑧', '常用動詞（日常生活）', '🏨 飯店、觀光']];
 const SOON = ['', '', '', '', '去哪裡、怎麼去（へ・で）', '每天做什麼（を・動詞變化・副詞）', '形容詞、想要～（たい）', '有、在、喜歡（が・あります・います）', '給、收到（あげます・もらいます）', '數東西（量詞）', '昨天、以前（過去式）', '比較（より・ほど・いちばん）', '動詞的應用（提議、一邊～一邊～）'];
 const NOSPLIT = ['この', 'その', 'あの', 'どの', 'いっしょに', 'すみません', 'ちがいます', 'ください', 'よろしく', 'はじめまして', 'ありません', 'ちょっと…', 'いつも', 'とても'];
 function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾的 です/ます 和助詞切開
@@ -289,6 +289,7 @@ function route() {
   else if (p === 'lab' && a === 'kosoado') labKosoado();
   else if (p === 'lab' && a === 'clock') labClock();
   else if (p === 'lab' && a === 'konbini') labKonbini();
+  else if (p === 'lab' && a === 'numbers') labNumbers();
   else if (p === 'V' && BYL[a] && BYL[a].video) watch(BYL[a]);
   else home();
   window.scrollTo(0, 0);
@@ -312,7 +313,7 @@ function home() {
       '<div class="bar"><i style="width:' + s.good / s.n * 100 + '%;background:var(--l4)"></i><i style="width:' + (s.seen - s.good) / s.n * 100 + '%;background:var(--l2)"></i></div>' +
       '<div class="muted">熟練 ' + s.good + ' / ' + s.n + (s.fix ? '・錯題 ' + s.fix : '') + '</div>' +
       '<div class="row3"><button class="ghost" onclick="location.hash=\'L/' + no + '\'">📖 重點</button><button class="ghost" onclick="location.hash=\'P/' + no + '\'">✏️ 練習</button><button class="ghost" onclick="location.hash=\'T/' + no + '\'">⚡ 測驗</button></div>' +
-      (L.video ? '<button class="ghost" onclick="location.hash=\'V/' + no + '\'">📺 影片／🎧 只聽聲音（' + L.video.length + ' 集，各 3 分鐘）</button>' : '') +
+      (L.video ? '<button class="ghost" onclick="location.hash=\'V/' + no + '\'">📺 影片／🎧 只聽聲音（' + (L.video.length > 1 ? L.video.length + ' 集，' : '') + '約 ' + Math.round(L.video[0].min) + ' 分鐘）</button>' : '') +
       (L.lab ? '<button class="ghost" onclick="location.hash=\'lab/' + L.lab.id + '\'">🎮 ' + esc(L.lab.title) + '</button>' : '') + '</div>';
   };
   const soon = (tag, title, sub) => '<div class="card les soon"><div class="hd"><span><span class="no">' + tag + '</span><h3>' + esc(title) + '</h3>' + (sub ? '<span class="muted">' + esc(sub) + '</span>' : '') + '</span><span class="badge b0">製作中</span></div></div>';
@@ -328,7 +329,7 @@ function home() {
 
 function learn(L) {
   let h = '<div class="top"><a href="#">← 課程列表</a><span class="muted">' + LN(L) + '・重點</span></div><h1>' + esc(L.title) + '</h1>' +
-    (L.video ? '<button class="ghost" style="width:100%;margin-bottom:12px" onclick="location.hash=\'V/' + L.no + '\'">📺 影片／🎧 只聽聲音（' + L.video.length + ' 集，各 3 分鐘）</button>' : '');
+    (L.video ? '<button class="ghost" style="width:100%;margin-bottom:12px" onclick="location.hash=\'V/' + L.no + '\'">📺 影片／🎧 只聽聲音（' + (L.video.length > 1 ? L.video.length + ' 集，' : '') + '約 ' + Math.round(L.video[0].min) + ' 分鐘）</button>' : '');
   L.goals.forEach(g => {
     h += '<div class="card"><h2>' + (typeof L.no === 'number' ? '學習目標 ' + g.no : '重點 ' + '①②③④⑤⑥'[g.no - 1]) + '</h2><h3>' + esc(g.title) + '</h3><div class="pat jp">' + ruby(g.pattern) + '</div><p style="margin:6px 0">' + esc(g.explain) + '</p>';
     L.sents.filter(s => s.g === g.no).forEach(s => { h += '<div class="ex"><button class="play" data-a="' + s.id + '">▶</button><span class="s jp">' + ruby(s.jp) + '</span><span class="z">' + esc(s.zh) + '</span><button class="zb" data-z="' + s.id + '">🔍 拆解</button><div class="brkw" id="z-' + s.id + '" hidden>' + breakdown(ITEMS[s.id]) + '</div></div>'; });
@@ -387,13 +388,15 @@ function makeQ(it, type) {
   const take = (arr, f, n) => { const seen = new Set([f(it)]), out = []; R.shuffle(arr).forEach(x => { const v = f(x); if (!seen.has(v) && out.length < n) { seen.add(v); out.push(x); } }); return out; };
   const fill3 = (k, f, need) => { let o = take(same(k).filter(need || (() => true)), f, 3); if (o.length < 3) o = o.concat(take(others(k).filter(x => !o.includes(x) && (need || (() => true))(x)), f, 3 - o.length)); return o; };
   let opts;
+  const nearNums = () => same('w').filter(x => x.num).sort((a, b) => Math.abs(Math.log((+a.k + 1) / (+it.k + 1))) - Math.abs(Math.log((+b.k + 1) / (+it.k + 1)))).slice(0, 6);   // 數字：選項用大小相近的
   if (type === 'read') {
     const trap = { 'よじ': 'よんじ', 'くじ': 'きゅうじ', 'しちじ': 'ななじ', 'さんびゃく': 'さんひゃく', 'ろっぴゃく': 'ろくひゃく', 'はっぴゃく': 'はちひゃく', 'さんぜん': 'さんせん', 'はっせん': 'はちせん', 'いちまん': 'じゅうせん', 'ひゃく': 'いちひゃく', 'せん': 'いちせん' }[it.r];
-    const o = take(it.num ? same('w').filter(x => x.num && x.r !== it.r) : others('w').filter(x => x.r !== it.r && hasKanji(x.k)), x => x.r, trap ? 2 : 3).map(x => x.r);
-    opts = R.shuffle([it.r].concat(trap ? [trap] : [], o)).map(r => ({ txt: r, ok: r === it.r }));
+    const tr = it.traps ? R.shuffle(it.traps).slice(0, 2) : trap ? [trap] : [];   // 數字：念錯的變音當選項
+    const o = take(it.num ? nearNums().filter(x => x.r !== it.r && !tr.includes(x.r)) : others('w').filter(x => x.r !== it.r && hasKanji(x.k)), x => x.r, 3 - tr.length).map(x => x.r);
+    opts = R.shuffle([it.r].concat(tr, o)).map(r => ({ txt: r, ok: r === it.r }));
   } else if (type === 'mean') opts = R.shuffle([it].concat(fill3('w', x => x.zh))).map(x => ({ txt: x.zh, ok: x === it, zh: true }));
   else if (type === 'pic') opts = R.shuffle([it].concat(fill3('w', x => x.k, x => !!x.pic))).map(x => ({ txt: x.k, sub: x.k !== x.r ? x.r : '', ok: x === it }));
-  else if (type === 'hear') opts = R.shuffle([it].concat(fill3('w', x => x.k, it.num ? (x => x.num) : (x => !x.num)))).map(x => ({ txt: x.k, ok: x === it, id: x.id }));
+  else if (type === 'hear') opts = R.shuffle([it].concat(it.num ? take(nearNums(), x => x.k, 3) : fill3('w', x => x.k, x => !x.num))).map(x => ({ txt: x.k, ok: x === it, id: x.id }));
   else if (type === 'listen') opts = R.shuffle([it].concat(fill3('s', x => x.zh))).map(x => ({ txt: x.zh, ok: x === it, zh: true }));
   else if (type === 'fill') opts = R.shuffle([it.blank].concat(it.opts)).map(x => ({ txt: x, ok: x === it.blank, ruby: true }));
   return { it, type, opts };
@@ -408,7 +411,7 @@ function quiz(mode, L) {
   let i = 0, score = 0, wrongs = [];
   const header = () => '<div class="top"><a href="' + back + '">← ' + (L ? LN(L) : '課程列表') + '</a><span class="muted">' + title + '</span></div>' +
     '<div class="hud"><span>' + (i + 1) + ' / ' + qs.length + '</span><span>答對 ' + score + '</span></div><div class="bar"><i style="width:' + i / qs.length * 100 + '%;background:var(--blue)"></i></div>';
-  const full = (it) => it.kind === 'w' ? '<span class="jp" style="font-size:26px">' + (it.pic ? it.pic + ' ' : '') + esc(it.k) + '</span>' + (it.k !== it.r ? '<span class="jp">（' + esc(it.r) + '）</span>' : '') + (it.num ? '' : ' ＝ ' + esc(it.zh))
+  const full = (it) => it.kind === 'w' ? '<span class="jp" style="font-size:26px">' + (it.pic ? it.pic + ' ' : '') + esc(it.k) + '</span>' + (it.k !== it.r ? '<span class="jp">（' + esc(it.r) + '）</span>' : '') + (it.num && !/念|零/.test(it.zh) ? '' : ' ＝ ' + esc(it.zh))
     : '<div class="ans jp">' + ruby(it.jp) + '</div><div>' + esc(it.zh) + '</div>' + breakdown(it);
   const goalTip = (it) => { if (it.kind !== 's' || it.phrase) return ''; const g = BYL[it.L].goals.find(g => g.no === it.g); return g ? '<div class="muted" style="margin-top:6px">句型：<span class="jp">' + ruby(g.pattern) + '</span>（' + LN(BYL[it.L]) + '・' + esc(g.title) + '）</div>' : ''; };
   function show() {
@@ -544,7 +547,7 @@ function labKosoado() {
       if (ok) score++;
       app.querySelectorAll('[data-ans]').forEach(x => { x.disabled = true; if (x.dataset.ans === right) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
       app.querySelector('#say').innerHTML = (ok ? '⭕ ' : '❌ ') + ruby(sentence(target)); play(clip(target));
-      setTimeout(() => { busy = false; quizN++; if (quizN > 5) { target = null; draw('🎉 5 題答對 ' + score + ' 題' + (score === 5 ? '，全對！' : '，再玩一次？')); quizN = 0; } else next(); }, 2200);
+      setTimeout(() => { if (location.hash !== '#lab/kosoado') return; busy = false; quizN++; if (quizN > 5) { target = null; draw('🎉 5 題答對 ' + score + ' 題' + (score === 5 ? '，全對！' : '，再玩一次？')); quizN = 0; } else next(); }, 2200);
     });
   }
   function next() { roll(); target = R.pick(['near', 'mid', 'far']); draw('<span style="font-size:17px">「わたし」要說閃爍的那個' + (mode === 'thing' ? '東西' : '地方') + '，用哪一個？</span>'); }
@@ -556,7 +559,8 @@ function labKosoado() {
 function labKonbini() {
   const P = BYL.T1, YEN = P.yen, SC = P.scene;
   const spots = SC.map(o => Object.assign({ pic: ITEMS[o.w].pic }, o)).concat([{ key: 'reji', w: 'T1w11', x: 262, y: 168, price: 0, draw: 'reji' }, { key: 'clerk', w: 'T1w12', x: 318, y: 150, price: 0, draw: 'clerk' }]);
-  let mode = 'look', qn = 0, score = 0, ask = null, busy = false, lit = null;
+  let mode = 'look', qn = 0, score = 0, ask = null, busy = false, lit = null, gen = 0;
+  const alive = (g) => g === gen && location.hash === '#lab/konbini';
   const back = '#L/T1';
   const label = (o) => { const w = ITEMS[o.w]; return '<b style="font-size:24px">' + esc(w.k) + '</b>' + (w.k !== w.r ? '（' + esc(w.r) + '）' : '') + ' <span style="font-size:16px">' + esc(w.zh) + '</span>'; };
   const priceTxt = (n) => n + '円<span class="muted" style="font-size:15px">（' + esc(YEN[String(n)]) + '）</span>';
@@ -584,7 +588,7 @@ function labKonbini() {
     return g + '</svg>';
   }
   function draw(msg) {
-    app.innerHTML = '<div class="top"><a href="' + back + '">← 主題包 ①</a><span class="muted">🎮 動手玩</span></div><h1>便利商店</h1>' +
+    app.innerHTML = '<div class="top"><a href="' + back + '">← 主題包 ②</a><span class="muted">🎮 動手玩</span></div><h1>便利商店</h1>' +
       '<div class="seg" style="grid-template-columns:1fr 1fr 1fr"><button data-m="look" class="' + (mode === 'look' ? 'on' : '') + '">👆 探索</button><button data-m="find" class="' + (mode === 'find' ? 'on' : '') + '">🔎 找找看</button><button data-m="price" class="' + (mode === 'price' ? 'on' : '') + '">💴 多少錢</button></div>' +
       '<div class="card lab">' + svg() + '<div class="say jp" id="say">' + (msg || '') + '</div>' +
       (ask && ask.kind === 'price' ? '<div class="opts">' + ask.opts.map(n => '<button class="jp" data-p="' + n + '">' + n + '円</button>').join('') + '</div>' : '') +
@@ -593,7 +597,7 @@ function labKonbini() {
       (qn ? '<p class="muted" style="text-align:center;margin:8px 0 0">第 ' + qn + ' / ' + (mode === 'find' ? 8 : 6) + ' 題・答對 ' + score + '</p>' : '') +
       '<p class="muted" style="margin:10px 0 0">' + (mode === 'look' ? '點架子上的東西、收銀台、店員，聽日文怎麼說。價錢牌上 300、600、800 的念法會變音，多點幾次聽聽看。'
         : mode === 'find' ? '聽到單字，點圖上的那個東西。答錯的字會放進錯題本。' : '店員說價錢，選出正確的數字。注意 300 さんびゃく、600 ろっぴゃく、800 はっぴゃく、3000 さんぜん、8000 はっせん。') + '</p></div>';
-    app.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { audio.pause(); mode = b.dataset.m; ask = null; qn = 0; score = 0; lit = null; busy = false; draw(mode === 'look' ? '<span class="muted" style="font-size:15px">點一點圖上的東西</span>' : ''); });
+    app.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { audio.pause(); gen++; mode = b.dataset.m; ask = null; qn = 0; score = 0; lit = null; busy = false; draw(mode === 'look' ? '<span class="muted" style="font-size:15px">點一點圖上的東西</span>' : ''); });
     app.querySelectorAll('.spot').forEach(el => el.onclick = () => tap(el.dataset.k));
     const go = app.querySelector('#go'); if (go) go.onclick = () => { qn = 0; score = 0; next(); };
     const rep = app.querySelector('#rep'); if (rep) rep.onclick = () => play(ask.clip);
@@ -609,14 +613,14 @@ function labKonbini() {
     if (ok) score++;
     lit = ask.o.key; const said = play(ask.o.w);
     draw((ok ? '⭕ ' : '❌ 是這個：') + label(ask.o) + (ok ? '' : '<br><span class="muted" style="font-size:15px">你點的是 ' + esc(ITEMS[o.w].k) + '（' + esc(ITEMS[o.w].zh) + '）</span>'));
-    Promise.all([said, new Promise(r => setTimeout(r, ok ? 900 : 2200))]).then(advance);
+    const g = gen; Promise.all([said, new Promise(r => setTimeout(r, ok ? 900 : 2200))]).then(() => { if (alive(g)) advance(); });
   }
   function answerPrice(n, b) {
     if (busy) return; busy = true;
     const ok = n === ask.n; if (ok) score++;
     app.querySelectorAll('[data-p]').forEach(x => { x.disabled = true; if (+x.dataset.p === ask.n) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
     app.querySelector('#say').innerHTML = (ok ? '⭕ ' : '❌ ') + priceTxt(ask.n) + (ok ? '' : '<br><span class="muted" style="font-size:15px">' + n + '円 念 ' + esc(YEN[String(n)]) + '</span>');
-    Promise.all([play(ask.clip), new Promise(r => setTimeout(r, ok ? 900 : 2400))]).then(advance);
+    const g = gen; Promise.all([play(ask.clip), new Promise(r => setTimeout(r, ok ? 900 : 2400))]).then(() => { if (alive(g)) advance(); });
   }
   function advance() {
     busy = false;
@@ -639,6 +643,101 @@ function labKonbini() {
   }
   preload(spots.map(o => o.w).concat(SC.map(o => 'sc-' + o.key), ['T1s11']));
   draw('<span class="muted" style="font-size:15px">點一點圖上的東西</span>');
+}
+
+// ---------- 動手玩：數字拆解（主題包 ①）----------
+// 大數字從大到小一段一段念：3480 → さんぜん｜よんひゃく｜はちじゅう。中間的 0 不念。
+const KD = ['', 'いち', 'に', 'さん', 'よん', 'ご', 'ろく', 'なな', 'はち', 'きゅう'];
+function kanaPart(v) {   // 一段（3、30、300、3000、30000）的念法
+  const units = [[10000, 'まん'], [1000, 'せん'], [100, 'ひゃく'], [10, 'じゅう'], [1, '']];
+  const [u, name] = units.find(([u]) => v >= u), d = v / u;
+  if (u === 1000) return { 1: 'せん', 3: 'さんぜん', 8: 'はっせん' }[d] || KD[d] + 'せん';
+  if (u === 100) return { 1: 'ひゃく', 3: 'さんびゃく', 6: 'ろっぴゃく', 8: 'はっぴゃく' }[d] || KD[d] + 'ひゃく';
+  if (u === 10) return (d === 1 ? '' : KD[d]) + 'じゅう';
+  return KD[d] + name;
+}
+function partsOf(n) { const out = []; [10000, 1000, 100, 10, 1].forEach(u => { const d = Math.floor(n / u) % (u === 10000 ? 10 : 10); if (d) out.push(d * u); }); return out; }
+function partTraps(v) {   // 一段的錯誤念法：變音錯、4/7/9 用錯、1 多念 いち
+  const r = kanaPart(v), out = [];
+  [['びゃく', 'ひゃく'], ['ぴゃく', 'ひゃく'], ['ぜん', 'せん'], ['っせん', 'ちせん'], ['ろっ', 'ろく'], ['はっ', 'はち']].forEach(([a, b]) => { if (r.includes(a)) out.push(r.replace(a, b)); });
+  if (/^(にひゃく|よんひゃく|ごひゃく|ななひゃく|きゅうひゃく)$/.test(r)) out.push(r.replace('ひゃく', 'びゃく'));
+  if (/^(にせん|よんせん|ごせん|ろくせん|ななせん|きゅうせん)$/.test(r)) out.push(r.replace('せん', 'ぜん'));
+  if (/^よん(ひゃく|せん)$/.test(r)) out.push(r.replace('よん', 'し'));
+  if (/^なな(ひゃく|せん)$/.test(r)) out.push(r.replace('なな', 'しち'));
+  if (/^きゅう(ひゃく|せん)$/.test(r)) out.push(r.replace('きゅう', 'く'));
+  if (r === 'ひゃく' || r === 'せん' || r === 'じゅう') out.push('いち' + r);
+  return [...new Set(out)].filter(x => x !== r);
+}
+function labNumbers() {
+  const P = BYL.T0, BANK = P.bank, KANA = P.kana, PLACE = { 10000: '萬', 1000: '千', 100: '百', 10: '十', 1: '個' };
+  const COL = { 10000: '#8e44ad', 1000: '#c0392b', 100: '#d68910', 10: '#1f8a4c', 1: '#2b5fd9' };
+  let mode = 'look', n = R.pick(BANK), qn = 0, score = 0, step = 0, miss = false, busy = false, opts = null, gen = 0;
+  const alive = (g) => g === gen && location.hash === '#lab/numbers';   // 換模式或離開頁面後，還在等語音的動作不要再畫
+  const unitOf = (v) => [10000, 1000, 100, 10, 1].find(u => v >= u);
+  const blocks = (upto) => '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0">' + partsOf(n).map((v, k) => {
+    const u = unitOf(v), shown = upto == null || k < upto;
+    return '<button class="ghost nb" data-v="' + v + '" style="border:2px solid ' + COL[u] + ';min-width:74px;padding:6px 8px;' + (upto === k ? 'box-shadow:0 0 0 3px var(--pick)' : '') + '"><small style="color:' + COL[u] + ';font-weight:700">' + PLACE[u] + '</small><br><b style="font-size:20px">' + v + '</b><br><span class="jp" style="font-size:16px">' + (shown ? kanaPart(v) : '？') + '</span></button>'; }).join('') + '</div>';
+  function draw(msg) {
+    let h = '<div class="top"><a href="#L/T0">← 主題包 ①</a><span class="muted">🎮 動手玩</span></div><h1>數字拆解</h1>' +
+      '<div class="seg" style="grid-template-columns:1fr 1fr 1fr"><button data-m="look" class="' + (mode === 'look' ? 'on' : '') + '">👆 拆解</button><button data-m="step" class="' + (mode === 'step' ? 'on' : '') + '">🧩 一段段念</button><button data-m="hear" class="' + (mode === 'hear' ? 'on' : '') + '">👂 聽數字</button></div><div class="card lab">';
+    if (mode === 'look') {
+      h += '<button class="ghost" id="whole" style="width:100%;border:0;background:none"><div class="jp" style="font-size:54px;font-weight:700">' + n + '</div><div class="jp" style="font-size:20px">' + esc(KANA[n]) + ' 🔊</div></button>' + blocks() +
+        '<button class="big" id="nx">換一個數字 ↻</button><p class="muted" style="margin:10px 0 0">點整個數字聽完整念法，點下面的色塊聽每一段。從大到小一段一段念，中間的 0 不念。</p>';
+    } else if (mode === 'step') {
+      h += qn ? '<div class="jp" style="font-size:54px;font-weight:700;text-align:center">' + n + '</div>' + blocks(step) +
+        (opts ? '<p class="muted" style="text-align:center;margin:0">「' + PLACE[unitOf(partsOf(n)[step])] + '」這一段（' + partsOf(n)[step] + '）怎麼念？</p><div class="opts">' + opts.map(o => '<button class="jp" data-o="' + o + '">' + o + '</button>').join('') + '</div>' : '') +
+        '<div class="say jp" id="say">' + (msg || '') + '</div><p class="muted" style="text-align:center;margin:6px 0 0">第 ' + qn + ' / 6 題・全對 ' + score + '</p>'
+        : '<div class="say" id="say">' + (msg || '<span class="muted" style="font-size:15px">一個數字拆成幾段，一段一段選念法</span>') + '</div><button class="big" id="go">🧩 開始（6 題）</button>';
+    } else {
+      h += qn ? '<div style="text-align:center"><button class="spk" id="rep">🔊</button></div><div class="say jp" id="say">' + (msg || '<span style="font-size:17px">聽一聽，是哪個數字？</span>') + '</div>' +
+        (opts ? '<div class="opts">' + opts.map(o => '<button class="jp" data-p="' + o + '">' + o + '</button>').join('') + '</div>' : '') + '<p class="muted" style="text-align:center;margin:6px 0 0">第 ' + qn + ' / 6 題・答對 ' + score + '</p>'
+        : '<div class="say" id="say">' + (msg || '<span class="muted" style="font-size:15px">聽日文念的數字，選出是哪一個</span>') + '</div><button class="big" id="go">👂 開始（6 題）</button>';
+    }
+    app.innerHTML = h + '</div>';
+    app.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { audio.pause(); gen++; mode = b.dataset.m; qn = 0; score = 0; opts = null; busy = false; draw(); });
+    app.querySelectorAll('.nb').forEach(b => b.onclick = () => { if (mode === 'look') play('nc-' + b.dataset.v); });
+    const w = app.querySelector('#whole'); if (w) w.onclick = () => play('num-' + n);
+    const nx = app.querySelector('#nx'); if (nx) nx.onclick = () => { n = R.pick(BANK.filter(x => x !== n)); draw(); play('num-' + n); };
+    const go = app.querySelector('#go'); if (go) go.onclick = () => { qn = 0; score = 0; next(); };
+    const rep = app.querySelector('#rep'); if (rep) rep.onclick = () => play('num-' + n);
+    app.querySelectorAll('[data-o]').forEach(b => b.onclick = () => pickPart(b));
+    app.querySelectorAll('[data-p]').forEach(b => b.onclick = () => pickNum(b));
+  }
+  function partOpts() {
+    const v = partsOf(n)[step], r = kanaPart(v), u = unitOf(v);
+    const tr = R.shuffle(partTraps(v)).slice(0, 2);
+    const other = R.shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => kanaPart(d * u)).filter(x => x !== r && !tr.includes(x)));
+    return R.shuffle([r].concat(tr, other.slice(0, 3 - tr.length)));
+  }
+  function pickPart(b) {
+    if (busy) return; busy = true;
+    const v = partsOf(n)[step], r = kanaPart(v), ok = b.dataset.o === r; if (!ok) miss = true;
+    app.querySelectorAll('[data-o]').forEach(x => { x.disabled = true; if (x.dataset.o === r) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
+    const g = gen;
+    play('nc-' + v).then(() => setTimeout(() => {
+      if (!alive(g)) return;
+      busy = false; step++;
+      if (step < partsOf(n).length) { opts = partOpts(); draw(ok ? '⭕' : '❌ ' + v + ' 念 ' + r); return; }
+      if (!miss) score++;
+      opts = null; draw((miss ? '❌ ' : '⭕ ') + n + ' ＝ ' + esc(KANA[n]));
+      busy = true; play('num-' + n).then(() => setTimeout(() => { if (!alive(g)) return; busy = false; if (qn >= 6) { qn = 0; draw('🎉 6 題全對 ' + score + ' 題'); } else next(); }, 900));
+    }, ok ? 300 : 1200));
+  }
+  function pickNum(b) {
+    if (busy) return; busy = true;
+    const ok = +b.dataset.p === n; if (ok) score++;
+    app.querySelectorAll('[data-p]').forEach(x => { x.disabled = true; if (+x.dataset.p === n) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
+    app.querySelector('#say').innerHTML = (ok ? '⭕ ' : '❌ ') + n + ' ＝ ' + esc(KANA[n]) + (ok ? '' : '<br><span class="muted" style="font-size:15px">' + b.dataset.p + ' 念 ' + esc(KANA[b.dataset.p]) + '</span>');
+    const g = gen;
+    Promise.all([play('num-' + n), new Promise(r => setTimeout(r, ok ? 900 : 2400))]).then(() => { if (!alive(g)) return; busy = false; if (qn >= 6) { qn = 0; opts = null; draw('🎉 6 題答對 ' + score + ' 題'); } else next(); });
+  }
+  function next() {
+    qn++; n = R.pick(BANK.filter(x => x !== n));
+    if (mode === 'step') { n = R.pick(BANK.filter(x => x >= 100)); step = 0; miss = false; opts = partOpts(); draw(); }
+    else { const near = BANK.filter(x => x !== n).sort((a, b) => Math.abs(Math.log(a / n)) - Math.abs(Math.log(b / n))).slice(0, 5); opts = R.shuffle([n].concat(R.shuffle(near).slice(0, 3))); draw(); play('num-' + n); }
+  }
+  preload(BANK.map(x => 'num-' + x));
+  draw();
 }
 
 // ---------- 動手玩：時鐘 ----------
@@ -664,7 +763,7 @@ function labClock() {
       app.querySelectorAll('[data-o]').forEach(x => { x.disabled = true; if (x.dataset.o === right) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
       app.querySelector('#say').innerHTML = (ok ? '⭕ ' : '❌ ') + ask.h + '時 ＝ ' + right + (TRAP[ask.h] ? '（' + TRAP[ask.h] + '）' : '');
       play('clock-' + String(ask.h).padStart(2, '0'));
-      setTimeout(() => { busy = false; quizN++; if (quizN > 6) { ask = null; quizN = 0; draw('🎉 6 題答對 ' + score + ' 題'); } else next(); }, 2000);
+      setTimeout(() => { if (location.hash !== '#lab/clock') return; busy = false; quizN++; if (quizN > 6) { ask = null; quizN = 0; draw('🎉 6 題答對 ' + score + ' 題'); } else next(); }, 2000);
     });
   }
   function setHour(h, speak) {
