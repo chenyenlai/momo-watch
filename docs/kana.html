@@ -159,12 +159,14 @@ const rowOpen = (g) => { const o = openSet(); return g.chars.every(c => o.has(c.
 function nextUnit() { const o = openSet(); const id = ORDER[S.script].find(id => !unitChars(id).every(h => o.has(h))); return id ? { id, chars: unitChars(id).filter(h => !o.has(h)) } : null; }
 const R = { pick: a => a[Math.floor(Math.random() * a.length)], shuffle: a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; } };
 
-// 自動開下一組：開放的字都練過、沒有紅色（錯過還沒克服），而且 8 成以上到「快會了」（box ≥ 2）
+// 自動開下一組：開放的字都練過、紅色（錯過還沒克服）不超過 2 個，而且 8 成以上到「快會了」（box ≥ 2）
 // （以前要「全部」都到快會了，字一多就很難湊齊，新字一直不出來）
+// （以前要「完全沒有紅色」：開到 35 字時幾乎每回合都會錯 1 個，紅色永遠清不完，新字又卡住。紅色的字之後照樣會優先出）
+const RED_OK = 2;
 function autoUnlock() {
   const sc = SC(); let added = null;
   const open = ALLC.filter(cOpen), s = (c) => sc.c[c.h] || {};
-  const ready = open.every(c => s(c).n > 0 && !(s(c).fix > 0)) && open.filter(c => s(c).box >= 2).length >= Math.ceil(open.length * 0.8);
+  const ready = open.every(c => s(c).n > 0) && open.filter(c => s(c).fix > 0).length <= RED_OK && open.filter(c => s(c).box >= 2).length >= Math.ceil(open.length * 0.8);
   if (ready) {
     const nx = nextUnit();
     if (nx) { sc.open.push(nx.id); added = nx; save(); }
@@ -218,7 +220,7 @@ function home() {
   let h = '<div class="top"><a href="./">← 首頁</a><a href="#stats">📊 紀錄</a></div><h1>50 音練習</h1><p class="muted" id="sync" style="margin:-8px 0 0">' + esc(syncMsg) + '</p>' + seg() +
     '<div class="card"><h2>今天</h2><div class="stat"><span>已開放 <b>' + open.length + '</b> 字</span><span>熟練 <b>' + cnt[4] + '</b> / ' + n + '</span><span>今天答了 <b>' + todayN + '</b> 題</span></div>' +
     '<div class="bar">' + [4, 3, 2, 1].map(l => '<i style="width:' + cnt[l] / n * 100 + '%;background:var(--l' + l + ')"></i>').join('') + '</div>' +
-    (nu ? '<p class="muted" style="margin:10px 0 0">下一組：<b class="jp" style="font-size:18px;color:var(--ink)">' + nu.chars.map(K).join(' ') + '</b>（開放的字都練過、沒有紅色，8 成到綠色就自動開）<button class="ghost" id="openNext" style="padding:2px 10px;margin-left:6px;font-size:13px">現在就開</button></p>' :
+    (nu ? '<p class="muted" style="margin:10px 0 0">下一組：<b class="jp" style="font-size:18px;color:var(--ink)">' + nu.chars.map(K).join(' ') + '</b>（開放的字都練過、紅色不超過 2 個，8 成到綠色就自動開）<button class="ghost" id="openNext" style="padding:2px 10px;margin-left:6px;font-size:13px">現在就開</button></p>' :
       '<p class="muted" style="margin:10px 0 0">清音全部開放了 🎉 濁音、拗音想練時，在下面 50 音表按「我想先練這行」。</p>') +
     '<div style="display:grid;gap:10px;margin-top:14px"><button class="big" onclick="location.hash=\'practice\'">開始練習（10 題）▶</button>' +
     '<div class="row2"><button class="ghost" ' + (fix.length ? '' : 'disabled style="opacity:.5"') + ' onclick="location.hash=\'review\'">📒 錯題複習（' + fix.length + '）</button>' +
