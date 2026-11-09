@@ -167,6 +167,37 @@ function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾�
   });
   return out.filter(Boolean);
 }
+// 排句子：日文的語序比較自由。「名詞＋を/に/で/へ/が/も」這種詞組、和 いっしょに、毎日 這類時間副詞可以換位置；
+// 其他（主題「～は」放最前面、句尾的述語、の・と・この 連著後面的字）位置不能動。回傳 'exact'、'alt'（也對）或 false
+const ATT = new Set(['では', 'じゃ', 'は', 'を', 'に', 'で', 'と', 'の', 'が', 'へ', 'も', 'ませんでした', 'ませんか', 'ましょう', 'ましたか', 'ました', 'ますか', 'ですか', 'ですね', 'ません', 'です', 'ます', 'たい', 'たくない']);
+const MOVE_ADV = new Set(['いっしょに', 'いつも', 'よく', 'ときどき', '毎日', '毎朝', '今日', '明日', '昨日', '来週', '今', '全部で']);
+function groupsOf(chips) {   // 詞卡 → 詞組（每組是 chips 的索引）
+  const gs = [];
+  chips.forEach((c, k) => { if (ATT.has(plain(c)) && gs.length) gs[gs.length - 1].push(k); else gs.push([k]); });
+  for (let i = gs.length - 2; i >= 0; i--) {   // の・と 結尾、この/その/あの/どの：和後面那組黏在一起
+    const last = plain(chips[gs[i][gs[i].length - 1]]);
+    if (last === 'の' || last === 'と' || ['この', 'その', 'あの', 'どの'].includes(last)) gs.splice(i, 2, gs[i].concat(gs[i + 1]));
+  }
+  return gs;
+}
+function orderOK(chips, seq) {
+  const want = chips.map(plain).join(''), mine = seq.map(k => plain(chips[k])).join('');
+  if (mine === want) return 'exact';
+  const gs = groupsOf(chips), txt = (g) => g.map(k => plain(chips[k])).join('');
+  const movable = (g) => ['を', 'に', 'で', 'へ', 'が', 'も'].includes(plain(chips[g[g.length - 1]])) || MOVE_ADV.has(txt(g));
+  // 把我排的詞卡切回詞組（每組要連在一起、組內順序對）
+  const left = gs.slice(), mineG = []; let pos = 0;
+  while (pos < seq.length) {
+    const j = left.findIndex(g => g.every((k, n) => plain(chips[seq[pos + n]] || '') === plain(chips[k])));
+    if (j < 0) return false;
+    mineG.push(left[j]); pos += left[j].length; left.splice(j, 1);
+  }
+  if (left.length) return false;
+  if (mineG[mineG.length - 1] !== gs[gs.length - 1]) return false;   // 述語要在最後
+  if (/は$/.test(txt(gs[0])) && mineG[0] !== gs[0]) return false;     // 主題「～は」在最前面
+  const fixedA = gs.filter(g => !movable(g)), fixedB = mineG.filter(g => !movable(g));
+  return fixedA.every((g, k) => g === fixedB[k]) ? 'alt' : false;
+}
 function loadData(d) {
   D = d;
   // 拆解用的字典：助詞和固定說法、單字（漢字和讀音）、動詞去掉 ます 的部分
@@ -425,7 +456,7 @@ function quiz(mode, L) {
         fb.className = 'fb ok'; fb.innerHTML = '⭕ ' + full(it); const me = i;
         Promise.all([said, new Promise(r => setTimeout(r, q0.test ? 600 : 1000))]).then(() => { if (i === me) { i++; show(); } }); return; }
       fb.className = 'fb ' + (ok ? 'ok' : 'no');
-      fb.innerHTML = (ok ? '⭕ 答對了' : '❌ ' + (a == null ? '沒關係，記下來' : '正確答案')) + '<div style="margin-top:6px">' + full(it) + '</div>' + (ok ? '' : goalTip(it)) +
+      fb.innerHTML = (ok ? (q.alt ? '⭕ 你的順序也對！課本的說法是：' : '⭕ 答對了') : '❌ ' + (a == null ? '沒關係，記下來' : '正確答案')) + '<div style="margin-top:6px">' + full(it) + '</div>' + (ok ? '' : goalTip(it)) +
         '<div class="next"><button class="ghost" id="rep">🔊 再聽</button><button class="big" style="width:auto;padding:10px 24px" id="nx">下一題 →</button></div>';
       app.querySelector('#rep').onclick = () => play(it.id);
       app.querySelector('#nx').onclick = () => { i++; show(); };
@@ -437,7 +468,8 @@ function quiz(mode, L) {
       app.querySelectorAll('#pool button').forEach(b => b.onclick = () => { if (b.classList.contains('used')) return; b.classList.add('used'); seq.push(+b.dataset.k); redraw(); });
       app.querySelector('#clr').onclick = () => { seq.length = 0; app.querySelectorAll('#pool button').forEach(b => b.classList.remove('used')); redraw(); };
       chk.onclick = () => {
-        const mine = seq.map(k => plain(it.chips[k])).join(''), ok = mine === it.chips.map(plain).join('');
+        const mine = seq.map(k => plain(it.chips[k])).join(''), how = orderOK(it.chips, seq), ok = !!how;
+        if (how === 'alt') q.alt = true;
         built.classList.add(ok ? 'ok' : 'no'); app.querySelectorAll('#pool button, #built button, #clr, #chk').forEach(b => b.disabled = true);
         finish(ok, mine, mine);
       };
