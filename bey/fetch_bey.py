@@ -7,10 +7,13 @@
   BeybladeHub 商品頁      中文商品名、台灣售價、發售日；抽抽包（隨機強化組）有哪幾款、官方稀有款
   BEYWATCH.GG 每顆上蓋頁  全球比賽前幾名的使用率、冠軍率、排名（熱門度），以及商品型號 → 內含哪些上蓋
   BEYWATCH.GG 固鎖、軸心頁 使用率（熱門的固鎖／軸心）；稀有度由「出現在幾個商品」算出
+  stan-yao 的 Beyblade X 天梯（公開 Google 試算表）  每個型號（含套組裡每一顆）的原裝固鎖、軸心；
+                          台灣另一套中文譯名（例如 幻獸刺心＝獨角刺心），當成別名讓網頁搜得到
 
 用法：
   python3 bey/fetch_bey.py                 抓全部，寫到 docs/bey/data.json
   python3 bey/fetch_bey.py --cache DIR     抓過的頁面存到 DIR，下次直接讀（開發用）
+  python3 bey/fetch_bey.py --sheet-only    只重抓 stan-yao 試算表，補進現有的 data.json
 """
 import html
 import json
@@ -33,6 +36,8 @@ TIER_URL = HUB + '/t/4Xuagf8J'  # 10 月份 T 度排行（使用者指定）；�
 BW = 'https://beywatch.gg'
 BW_SITEMAP = BW + '/sitemaps/blades.xml'
 BW_PARTS = BW + '/sitemaps/parts.xml'
+SHEET = 'https://docs.google.com/spreadsheets/d/1TBHOpcsv25bBfWERq14CBIy4P1G7j-qpPhmclx_nTWI/gviz/tq?tqx=out:csv'
+SHEET_PAGE = 'https://stan-yao.github.io/beyblade_x_tier/'
 TW = timezone(timedelta(hours=8))
 CACHE = None
 
@@ -261,6 +266,67 @@ def bw_through(page):
 # ---------------------------------------------------------------------------
 
 
+def base_name(n):
+    """「蒼龍爆刃 金屬塗層:紫」「魔導神杖(綠)」→ 去掉顏色、版本"""
+    return re.sub(r'\s*(金屬塗層|特別版|火紅版).*|\(.*?\)|（.*?）', '', n).strip()
+
+
+def add_sheet(data):
+    """stan-yao 試算表：原裝固鎖、軸心（orig）和別名（blade['alias']）。失敗只印警告，不影響其他資料"""
+    import csv, io
+    try:
+        rows = list(csv.reader(io.StringIO(get(SHEET))))[1:]
+    except Exception as e:
+        print('stan-yao 試算表抓不到', type(e).__name__, file=sys.stderr)
+        return
+    rows = [x for x in rows if len(x) > 11 and x[2] == 'blade' and x[0]]
+    if len(rows) < 100:
+        print('stan-yao 試算表只有 %d 列，格式可能變了，先不用' % len(rows), file=sys.stderr)
+        return
+    bits = {k.lower(): k for k in data['parts']['bit']}
+    orig = {}
+    for x in rows:
+        r, b = x[6].strip(), bits.get(x[8].strip().lower(), x[8].strip())
+        if not (r or b):
+            continue
+        sub = re.sub(r'-\d\d$', '', x[0])
+        for code in {x[0], sub}:   # 套組 BX-20-01 也算進 BX-20
+            if code == sub and code != x[0] and data['products'].get(code, {}).get('random'):
+                continue           # 抽抽包抽到哪顆由網頁記錄，這裡不全部算
+            lst = orig.setdefault(code, [])
+            if [r, b] not in lst:
+                lst.append([r, b])
+    data['orig'] = orig
+    # 別名：名字一樣直接對；不一樣用型號／商品對到唯一一顆
+    blades, P = data['blades'], data['products']
+    by_zh = {b['zh']: b for b in blades}
+    by_code = {}
+    for b in blades:
+        if b['code'] and not b.get('part'):
+            by_code.setdefault(b['code'], []).append(b)
+    for x in rows:
+        name = base_name(x[1])
+        if name in by_zh:
+            continue
+        hit = by_code.get(x[0], [])
+        if len(hit) != 1:
+            pb = [i for i in P.get(x[0], {}).get('blades', []) if i]
+            hit = [b for b in blades if b['id'] in pb and not b.get('part')] if len(pb) == 1 else []
+        if len(hit) != 1:   # 抽抽包 BX-50-01：用原裝固鎖＋軸心對到是哪一款
+            pk = P.get(re.sub(r'-\d\d$', '', x[0]), {})
+            r, bt = x[6].strip(), bits.get(x[8].strip().lower(), x[8].strip())
+            ids = {v['blade'] for v in pk.get('variants') or [] if v.get('blade') and ' ' in v['name']
+                   and split_config(v['name'].split(' ', 1)[1])[1:] == (r or None, bt or None)}
+            hit = [b for b in blades if b['id'] in ids]
+        if len(hit) == 1:
+            al = hit[0].setdefault('alias', [])
+            if name not in al:
+                al.append(name)
+    data['sheet'] = {'url': SHEET_PAGE, 'n': len(rows)}
+    print('stan-yao 試算表 %d 列：原裝配置 %d 個型號，別名 %d 顆' % (
+        len(rows), len(orig), sum(1 for b in blades if b.get('alias'))))
+
+
 def build():
     blades = parse_hub_blades(get(HUB_BLADES))
     if len(blades) < 50:
@@ -381,7 +447,14 @@ def main():
     if '--cache' in sys.argv:
         CACHE = sys.argv[sys.argv.index('--cache') + 1]
         os.makedirs(CACHE, exist_ok=True)
-    data = build()
+    if '--sheet-only' in sys.argv:
+        with open(OUT, encoding='utf-8') as f:
+            data = json.load(f)
+        for b in data['blades']:
+            b.pop('alias', None)
+    else:
+        data = build()
+    add_sheet(data)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     tmp = OUT + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:

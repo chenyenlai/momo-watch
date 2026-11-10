@@ -80,6 +80,10 @@ form.rec .actions { grid-column: 1 / -1; margin-top: 0; }
 .mine { padding: 10px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; }
 .card h2 + .mine { border-top: 0; padding-top: 0; }
 .mine .what { font-weight: 600; }
+.mine .parts { font-weight: 400; font-size: 13px; color: var(--muted); }
+.have h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 4px 0 6px; }
+.chip.on { background: var(--ok-bg); color: var(--ok); font-weight: 700; }
+.chip small { opacity: .75; margin-left: 2px; }
 .mine .when { font-size: 13px; color: var(--muted); }
 .mine button { grid-row: 1 / 3; grid-column: 2; align-self: center; border: 0; background: none; color: var(--muted);
   font: inherit; font-size: 13px; cursor: pointer; padding: 6px; }
@@ -108,7 +112,7 @@ footer a { color: var(--muted); }
   <a class="home" href="./">← 首頁</a>
   <h1>戰鬥陀螺查詢</h1>
   <div class="search">
-    <input id="q" type="search" placeholder="型號或名稱，例如 UX-03、魔導神杖" autocomplete="off" enterkeyhint="search">
+    <input id="q" type="search" placeholder="型號、名稱或零件，例如 UX-03、魔導神杖、1-60、LR" autocomplete="off" enterkeyhint="search">
   </div>
   <div id="view"><p class="empty">載入資料中…</p></div>
   <section class="card" id="mine"></section>
@@ -132,6 +136,30 @@ let S = { recs: [], addQ: [], delQ: [] };
 try { S = Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 const owned = (id) => S.recs.filter(r => (r.blades || []).includes(id));
+
+// 每筆紀錄裡的固鎖、軸心：抽抽包看抽到的那款，其他看原裝配置（stan-yao 試算表 → BeybladeHub 商品頁）
+function recParts(r) {
+  if (/（還沒拆）$/.test(r.name || '')) return [];
+  const got = (r.name || '').match(/：抽到 \S+ (.+)$/);
+  let combos;
+  if (got) combos = [splitCfg(got[1])];
+  else if (D.orig && D.orig[r.code]) combos = D.orig[r.code];
+  else {
+    const P = D.products[r.code];
+    combos = P && P.config ? [splitCfg(P.config.split(/[，。,；;\s]/)[0])] : [];
+  }
+  return combos.filter(([rr, bb]) => rr || bb);   // [[固鎖, 軸心], ...]
+}
+function myParts() {   // 'ratchet|1-60' → 來源紀錄名稱的清單
+  const m = new Map();
+  for (const r of S.recs) for (const [k, key] of recParts(r).flatMap(([rr, bb]) => [['ratchet', rr], ['bit', bb]]).filter(p => p[1])) {
+    const id = k + '|' + key;
+    if (!m.has(id)) m.set(id, []);
+    m.get(id).push((r.code ? r.code + ' ' : '') + r.name);
+  }
+  return m;
+}
+const ownPart = (kind, key) => myParts().get(kind + '|' + key) || [];
 
 function addRec(r) {
   r.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -246,6 +274,7 @@ function beyCard(b, rec) {
   let x = `<article class="card bey"><div class="top"><div>`;
   x += `<div class="name">${esc(b.zh)}</div>`;
   x += `<div class="sub">${esc([b.code, b.en, b.ja].filter(Boolean).join('・'))}</div>`;
+  if (b.alias) x += `<div class="sub">也叫：${esc(b.alias.join('、'))}</div>`;
   x += `<div class="sub">${esc([b.type, b.spin, b.weight ? b.weight + ' g' : ''].filter(Boolean).join('・'))}</div></div>`;
   x += `<div class="tier lv${lv}">${t ? esc(t.label) : '—'}<small>強度</small></div></div>`;
   if (isChip(b)) {
@@ -256,7 +285,12 @@ function beyCard(b, rec) {
   x += `<dl class="rows">`;
   if (b.part) x += `<dt>零件</dt><dd>CX 的${esc(b.part)}</dd>`;
   x += `<dt>強度</dt><dd>${t ? esc(t.label) + '（共 ' + D.tier.labels.length + ' 級，' + esc(D.tier.labels[0]) + ' 最強）' : '台灣 T 表沒排'}</dd>`;
-  if (t && t.parts && t.parts.length) x += `<dt>推薦搭配</dt><dd>${esc(t.parts.join('、'))}</dd>`;
+  if (t && t.parts && t.parts.length) {
+    const mp = myParts(), have = (k) => mp.has('ratchet|' + k) || mp.has('bit|' + k);
+    const n = t.parts.filter(have).length;
+    x += `<dt>推薦搭配</dt><dd>${t.parts.map(k => have(k) ? '<b>✓' + esc(k) + '</b>' : esc(k)).join('、')}` +
+      (S.recs.length ? `<br><small>${n ? '✓ 是你已經有的（' + n + ' 個）' : '這些你都還沒有'}</small>` : '') + `</dd>`;
+  }
   x += `<dt>熱門度</dt><dd>${esc(h.text)}</dd>`;
   if (st && st.first != null) x += `<dt>冠軍率</dt><dd>${st.first}%` + (st.recent ? `（近 90 天第 ${st.recent.rank} 名／${st.recent.of} 顆）` : '') + `</dd>`;
   const packs = Object.entries(D.products).filter(([c, p]) => p.random && (p.blades || []).includes(b.id));
@@ -286,6 +320,20 @@ function recForm(key, rec) {
   </form>`;
 }
 
+function partCard(kind, key) {
+  const d = D.parts[kind][key], p = partNote(kind, key), own = ownPart(kind, key);
+  let x = `<article class="card"><h2>${kind === 'ratchet' ? '固鎖' : '軸心'}</h2><div class="prod"><b>${esc(p.label)}</b></div><dl class="rows">`;
+  const info = [];
+  if (d.tier) info.push('T 表 ' + d.tier.label);
+  if (d.usage != null) info.push((p.hot ? '🔥 熱門，' : '') + '國外比賽 ' + d.usage + '% 組合在用');
+  if (info.length) x += `<dt>強度</dt><dd>${esc(info.join('，'))}</dd>`;
+  x += `<dt>我有</dt><dd>${own.length ? '✓ ' + own.length + ' 個：' + esc(own.join('、')) : S.recs.length ? '還沒有' : '還沒有紀錄'}</dd>`;
+  const ins = (d.in || []).filter(c => D.products[c]);
+  if (ins.length) x += `<dt>哪裡有</dt><dd>${p.gem ? '💎 少見，' : ''}${ins.length} 個商品：${ins.slice(0, 12).map(c =>
+    `<button class="chip" data-q="${esc(c)}">${esc(c)} ${esc(D.products[c].name)}</button>`).join(' ')}${ins.length > 12 ? '…' : ''}</dd>`;
+  return x + `</dl></article>`;
+}
+
 let recTargets = {};   // 卡片 key → 要記錄的內容
 function search(q) {
   const raw = q.trim();
@@ -298,9 +346,19 @@ function search(q) {
     return { code: c, prod, blades: [...ids].map(id => byId[id]).filter(Boolean) };
   }
   const n = norm(raw);
-  const hit = D.blades.filter(b => b.zh.includes(raw) || norm(b.en).includes(n) || (b.ja && b.ja.includes(raw)) || norm(b.code) === n);
+  const parts = [];
+  for (const kind of ['ratchet', 'bit']) for (const [key, d] of Object.entries(D.parts[kind] || {})) {
+    if (kind === 'ratchet' ? norm(key) === n : (key.toLowerCase() === raw.toLowerCase() || norm(d.name) === n)) parts.push([kind, key]);
+  }
+  if (parts.length && !/[^\x00-\x7f]/.test(raw) && raw.length <= 3) return { parts, blades: [] };   // 「LR」「1-60」只看零件
+  let hit = D.blades.filter(b => b.zh.includes(raw) || norm(b.en).includes(n) || (b.ja && b.ja.includes(raw)) || norm(b.code) === n ||
+    (b.alias || []).some(a => a.includes(raw)));
+  if (!hit.length) {   // CX 的名字＝紋章＋主刃（惡魔獵魂 → 獵魂）
+    const mains = D.blades.filter(b => b.part === '主刃' || b.part === '金屬戰刃');
+    hit = mains.filter(m => D.blades.some(c => isChip(c) && raw.startsWith(c.zh) && raw.slice(c.zh.length).startsWith(m.zh)));
+  }
   hit.sort((a, b) => (a.tier ? a.tier.level : 99) - (b.tier ? b.tier.level : 99));
-  return { blades: hit.slice(0, 15) };
+  return { parts, blades: hit.slice(0, 15) };
 }
 
 function render() {
@@ -310,7 +368,7 @@ function render() {
   let x = '';
   if (!r) {
     const top = D.blades.filter(b => b.tier && b.tier.level <= 1).sort((a, b) => a.tier.level - b.tier.level);
-    x += `<p class="meta">輸入型號（UX-03）、中文、英文或日文名稱。目前台灣 T 表最強：</p><div class="chips">`;
+    x += `<p class="meta">輸入型號（UX-03）、中文、英文或日文名稱，或固鎖、軸心（1-60、LR）。目前台灣 T 表最強：</p><div class="chips">`;
     x += top.map(b => `<button class="chip" data-q="${esc(b.code || b.zh)}">${esc(b.tier.label)} ${esc(b.zh)}</button>`).join('');
     x += `</div>`;
   } else if (r.code) {
@@ -371,9 +429,10 @@ function render() {
       x += `</div>`;
     }
     if (!r.blades.length) x += `<p class="empty">找不到 ${esc(r.code)}，可能是新商品或配件（發射器、戰鬥盤）</p>`;
-  } else if (!r.blades.length) {
+  } else if (!r.blades.length && !(r.parts || []).length) {
     x += `<p class="empty">找不到「${esc($('#q').value.trim())}」</p>`;
   }
+  for (const [kind, key] of (r && r.parts) || []) x += partCard(kind, key);
   for (const b of (r ? r.blades : [])) {
     const key = 'b:' + b.id;
     recTargets[key] = { code: (r.code && b.code !== r.code) ? r.code : b.code, name: b.zh, blades: [b.id], key };
@@ -387,9 +446,23 @@ function renderMine() {
   const recs = S.recs.slice().sort((a, b) => b.t - a.t);
   let x = `<h2>我買過的（${recs.length}）</h2>`;
   if (!recs.length) x += `<p class="empty">還沒有紀錄。查到陀螺後按「＋我買了」</p>`;
+  if (recs.length && D) {
+    const mp = myParts();
+    for (const [kind, title] of [['ratchet', '我的固鎖'], ['bit', '我的軸心']]) {
+      const keys = [...mp.keys()].filter(k => k.startsWith(kind + '|')).map(k => k.slice(kind.length + 1))
+        .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+      x += `<div class="have"><h3>${title}（${keys.length} 種）</h3><div class="chips">${keys.length ? keys.map(k => {
+        const c = mp.get(kind + '|' + k).length, pn = partNote(kind, k);
+        return `<button class="chip${pn && pn.hot ? ' on' : ''}" data-q="${esc(k)}">${esc(k)}${c > 1 ? '<small>×' + c + '</small>' : ''}</button>`;
+      }).join('') : '<span class="empty">紀錄裡看不出來</span>'}</div></div>`;
+    }
+    x += `<p class="meta">點一下看詳細・綠色是比賽熱門的・也可以在上面搜尋框打 1-60、LR 查</p>`;
+  }
   for (const r of recs) {
     const extra = [fmtDate(r.t), r.price != null ? '$' + r.price : '', r.note].filter(Boolean).join('・');
-    x += `<div class="mine"><div class="what">${esc((r.code ? r.code + ' ' : '') + r.name)}</div>`;
+    const ps = D ? recParts(r) : [];
+    const pt = /：抽到 /.test(r.name) ? '' : ps.map(([rr, bb]) => (rr || '') + (bb || '')).join('、');
+    x += `<div class="mine"><div class="what">${esc((r.code ? r.code + ' ' : '') + r.name)}${pt ? ' <span class="parts">' + esc(pt) + '</span>' : ''}</div>`;
     x += `<div class="when">${esc(extra)}</div><button data-del="${esc(r.id)}" aria-label="刪除">刪除</button></div>`;
   }
   $('#mine').innerHTML = x;
@@ -433,6 +506,7 @@ fetch('bey/data.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
   const t = d.tier;
   $('#foot').innerHTML = `強度：<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a>（${esc(t.author)}，${esc(t.updated)}）<br>` +
     `熱門度、冠軍率：<a href="${esc(d.usage.url)}" target="_blank" rel="noopener">BEYWATCH.GG</a> 國外比賽統計（到 ${esc(d.usage.through)}）<br>` +
+    (d.sheet ? `原裝配置、別名：<a href="${esc(d.sheet.url)}" target="_blank" rel="noopener">stan-yao Beyblade X 天梯</a><br>` : '') +
     `型號、名稱：<a href="https://beybladehub.app/parts/blades" target="_blank" rel="noopener">BeybladeHub 上蓋資料庫</a>・每週自動更新，上次 ${esc(d.updated)}`;
   const u = new URLSearchParams(location.search).get('q');
   if (u) $('#q').value = u;
