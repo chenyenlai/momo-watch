@@ -8,7 +8,8 @@
   BEYWATCH.GG 每顆上蓋頁  全球比賽前幾名的使用率、冠軍率、排名（熱門度），以及商品型號 → 內含哪些上蓋
   BEYWATCH.GG 固鎖、軸心頁 使用率（熱門的固鎖／軸心）；稀有度由「出現在幾個商品」算出
   stan-yao 的 Beyblade X 天梯（公開 Google 試算表）  每個型號（含套組裡每一顆）的原裝固鎖、軸心；
-                          台灣另一套中文譯名（例如 幻獸刺心＝獨角刺心），當成別名讓網頁搜得到
+                          台灣另一套中文譯名（例如 幻獸刺心＝獨角刺心），當成別名讓網頁搜得到；
+                          賽事統計（Combo Summary）：每顆上蓋得獎最多的固鎖＋軸心組合
 
 用法：
   python3 bey/fetch_bey.py                 抓全部，寫到 docs/bey/data.json
@@ -37,6 +38,7 @@ BW = 'https://beywatch.gg'
 BW_SITEMAP = BW + '/sitemaps/blades.xml'
 BW_PARTS = BW + '/sitemaps/parts.xml'
 SHEET = 'https://docs.google.com/spreadsheets/d/1TBHOpcsv25bBfWERq14CBIy4P1G7j-qpPhmclx_nTWI/gviz/tq?tqx=out:csv'
+COMBO_SHEET = 'https://docs.google.com/spreadsheets/d/18eTJLjyNmqDz5MH0-VD03TX4wobUCdHdrRMyo4uojDo/gviz/tq?tqx=out:csv&sheet=Combo%20Summary'
 SHEET_PAGE = 'https://stan-yao.github.io/beyblade_x_tier/'
 TW = timezone(timedelta(hours=8))
 CACHE = None
@@ -323,8 +325,71 @@ def add_sheet(data):
             if name not in al:
                 al.append(name)
     data['sheet'] = {'url': SHEET_PAGE, 'n': len(rows)}
+    add_combos(data, bits)
     print('stan-yao 試算表 %d 列：原裝配置 %d 個型號，別名 %d 顆' % (
         len(rows), len(orig), sum(1 for b in blades if b.get('alias'))))
+
+
+def add_combos(data, bits):
+    """賽事統計：每顆上蓋前 5 名組合 → blade['combos'] = [[固鎖, 軸心, 得獎次數, 冠軍次數, 冠軍率%, 近90天次數], ...]"""
+    import csv, io
+    try:
+        rows = list(csv.DictReader(io.StringIO(get(COMBO_SHEET))))
+    except Exception as e:
+        print('stan-yao 賽事統計抓不到', type(e).__name__, file=sys.stderr)
+        return
+    if len(rows) < 200 or 'site_blade_name' not in rows[0]:
+        print('stan-yao 賽事統計只有 %d 列，格式可能變了，先不用' % len(rows), file=sys.stderr)
+        return
+    blades = data['blades']
+    idx = {}
+    for b in blades:
+        idx.setdefault(b['zh'], b)
+        for a in b.get('alias', []):
+            idx.setdefault(a, b)
+    by_code = {}
+    for b in blades:
+        if b['code'] and not b.get('part'):
+            by_code.setdefault(b['code'], []).append(b)
+    chips = sorted((b['zh'] for b in blades if b.get('part') == '鎖定紋章'), key=len, reverse=True)
+    mains = sorted((b for b in blades if b.get('part') in ('主刃', '金屬戰刃')), key=lambda b: -len(b['zh']))
+
+    def find(name, code):
+        name = base_name(name)
+        if name in idx:
+            return idx[name]
+        if len(by_code.get(code, [])) == 1:
+            return by_code[code][0]
+        for c in chips:   # CX：紋章＋主刃（天馬爆擊 → 爆擊）
+            if name.startswith(c):
+                return next((m for m in mains if name[len(c):].startswith(m['zh'])), None)
+        return None
+
+    def num(v, f=int):
+        try:
+            return f(v)
+        except (TypeError, ValueError):
+            return 0
+    got = {}
+    for r in sorted(rows, key=lambda r: num(r.get('site_recommendation_rank'), int) or 10 ** 9):
+        b = find(r.get('site_blade_name', ''), r.get('site_blade_id', ''))
+        if not b:
+            continue
+        lst = got.setdefault(b['id'], [])
+        key = [r['ratchet'].strip(), bits.get(r['bit'].strip().lower(), r['bit'].strip())]
+        old = next((c for c in lst if c[:2] == key), None)
+        if old:   # 同一顆不同版本（左右旋、CX 不同紋章）合併
+            old[2] += num(r['total_wins']); old[3] += num(r['first_count']); old[5] += num(r['recent_90_count'])
+            old[4] = round(old[3] * 100 / old[2]) if old[2] else 0
+        elif len(lst) < 5:
+            lst.append(key + [num(r['total_wins']), num(r['first_count']),
+                              round(num(r['champion_rate'], float) * 100), num(r['recent_90_count'])])
+    for b in blades:
+        b.pop('combos', None)
+        if b['id'] in got:
+            b['combos'] = got[b['id']]
+    data['sheet']['combos'] = sum(num(r['total_wins']) for r in rows)
+    print('賽事統計 %d 組合，對到 %d 顆上蓋' % (len(rows), len(got)))
 
 
 def build():

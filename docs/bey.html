@@ -82,6 +82,10 @@ form.rec .actions { grid-column: 1 / -1; margin-top: 0; }
 .mine .what { font-weight: 600; }
 .mine .parts { font-weight: 400; font-size: 13px; color: var(--muted); }
 .have h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 4px 0 6px; }
+.combos { margin: 0; padding-left: 1.3em; }
+.combos li { margin: 2px 0; }
+.combos .chip { padding: 2px 10px; margin-right: 6px; }
+.combos small { color: var(--muted); }
 .chip.on { background: var(--ok-bg); color: var(--ok); font-weight: 700; }
 .chip small { opacity: .75; margin-left: 2px; }
 .mine .when { font-size: 13px; color: var(--muted); }
@@ -290,6 +294,15 @@ function beyCard(b, rec) {
     const n = t.parts.filter(have).length;
     x += `<dt>推薦搭配</dt><dd>${t.parts.map(k => have(k) ? '<b>✓' + esc(k) + '</b>' : esc(k)).join('、')}` +
       (S.recs.length ? `<br><small>${n ? '✓ 是你已經有的（' + n + ' 個）' : '這些你都還沒有'}</small>` : '') + `</dd>`;
+  }
+  if (b.combos && b.combos.length) {
+    const mp = myParts();
+    x += `<dt>比賽常勝</dt><dd><ol class="combos">${b.combos.slice(0, 3).map(([rr, bb, w, f, cr]) => {
+      const has = (!rr || mp.has('ratchet|' + rr)) && mp.has('bit|' + bb);
+      return `<li><button class="chip${has ? ' on' : ''}" data-q="${esc(rr || bb)}">${has ? '✓' : ''}${esc((rr || '') + bb)}</button>` +
+        `<small>得獎 ${w} 次${w >= 10 ? '・冠軍率 ' + cr + '%' : f ? '・冠軍 ' + f + ' 次' : ''}</small></li>`;
+    }).join('')}</ol>${S.recs.length && b.combos.slice(0, 3).some(([rr, bb]) => (!rr || mp.has('ratchet|' + rr)) && mp.has('bit|' + bb))
+      ? '<small>✓ 綠色是你手上零件就能組的</small>' : ''}</dd>`;
   }
   x += `<dt>熱門度</dt><dd>${esc(h.text)}</dd>`;
   if (st && st.first != null) x += `<dt>冠軍率</dt><dd>${st.first}%` + (st.recent ? `（近 90 天第 ${st.recent.rank} 名／${st.recent.of} 顆）` : '') + `</dd>`;
@@ -506,7 +519,7 @@ fetch('bey/data.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
   const t = d.tier;
   $('#foot').innerHTML = `強度：<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a>（${esc(t.author)}，${esc(t.updated)}）<br>` +
     `熱門度、冠軍率：<a href="${esc(d.usage.url)}" target="_blank" rel="noopener">BEYWATCH.GG</a> 國外比賽統計（到 ${esc(d.usage.through)}）<br>` +
-    (d.sheet ? `原裝配置、別名：<a href="${esc(d.sheet.url)}" target="_blank" rel="noopener">stan-yao Beyblade X 天梯</a><br>` : '') +
+    (d.sheet ? `原裝配置、別名、比賽常勝組合：<a href="${esc(d.sheet.url)}" target="_blank" rel="noopener">stan-yao Beyblade X 天梯</a><br>` : '') +
     `型號、名稱：<a href="https://beybladehub.app/parts/blades" target="_blank" rel="noopener">BeybladeHub 上蓋資料庫</a>・每週自動更新，上次 ${esc(d.updated)}`;
   const u = new URLSearchParams(location.search).get('q');
   if (u) $('#q').value = u;
