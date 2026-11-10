@@ -59,6 +59,15 @@ h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
 .route.branch .slow { padding-left: 14px; }
 .route .na { color: var(--muted); }
 .fast { color: var(--ok); } .mid { color: var(--warn); } .crawl { color: var(--bad); }
+.cam { padding: 4px 16px 14px; }
+.cam .q { font-size: 15px; font-weight: 600; margin: 4px 0 10px; }
+.cam .q.bad { color: var(--bad); } .cam .q.ok { color: var(--ok); }
+.cam button { width: 100%; border: 1px solid var(--line); background: var(--chip); color: var(--ink); font: inherit; font-weight: 600;
+  border-radius: 10px; padding: 10px; cursor: pointer; }
+.cam .frame { position: relative; margin-top: 10px; border-radius: 10px; overflow: hidden; background: #000; aspect-ratio: 352 / 240; }
+.cam .frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.cam .frame span { position: absolute; right: 8px; top: 8px; background: rgb(0 0 0 / .6); color: #fff; font-size: 12px; padding: 2px 8px; border-radius: 99px; }
+.cam .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
 .event { padding: 12px 0; border-top: 1px solid var(--line); }
 .event:first-of-type { border-top: 0; }
 .event .where { font-weight: 700; }
@@ -94,8 +103,15 @@ footer { color: var(--muted); font-size: 12px; margin-top: 20px; line-height: 1.
   </div>
   <p class="meta" id="meta"></p>
   <div id="view"><div class="empty">載入中…</div></div>
+  <section class="card cam" id="cam" hidden>
+    <h2>桃園出口（南下 47.5K）</h2>
+    <p class="q" id="camq"></p>
+    <button type="button" id="camBtn">▶ 看即時監視器（30 秒）</button>
+    <div class="frame" id="camFrame" hidden><img id="camImg" alt="國1 南下 47.5K 桃園出口前即時監視器"><span id="camLeft"></span></div>
+    <p class="note">高公局即時影像，播放時每分鐘約 7MB 流量，30 秒後自動停止。</p>
+  </section>
   <footer>
-    國道 1 號 14–50K（含汐五／五楊高架）。資料：高公局即時事件與路段車速、警廣即時路況、Open-Meteo 天氣預報。<br>
+    國道 1 號 14–50K（含汐五／五楊高架）。資料：高公局即時事件、路段車速、車輛偵測器與監視器，警廣即時路況，中央氣象署與 Open-Meteo 天氣。<br>
     由家裡的 NAS 即時抓取（路況資料只開放台灣網路），NAS 關機時無法更新。上下班推播與盯場時 NAS 會自動更新這頁的資料。
   </footer>
 </main>
@@ -144,7 +160,7 @@ function render(note) {
     meta.textContent = `${hhmm(p.ts)} NAS 更新${ago ? `（${ago}）` : ""}${age >= 5 ? "・按「查詢路況」取得最新" : ""}`
     if (age >= 5) meta.className = "meta stale"
   } else meta.textContent = ""
-  if (!p) { $("#view").innerHTML = state.busy ? `<div class="empty">查詢中…</div>` : `<div class="empty">按右上角「查詢路況」取得最新路況</div>`; return }
+  if (!p) { $("#view").innerHTML = state.busy ? `<div class="empty">查詢中…</div>` : `<div class="empty">按右上角「查詢路況」取得最新路況</div>`; renderCam(p); return }
 
   const bad = p.events.length > 0
   let html = `<div class="banner ${bad ? "bad" : "ok"}">${esc(p.status)}</div>`
@@ -192,7 +208,38 @@ function render(note) {
   }
   if (p.errors.length) html += `<p class="err">⚠️ 抓取失敗：${esc(p.errors.join("、"))}</p>`
   $("#view").innerHTML = html
+  renderCam(p)
 }
+
+// 下班：桃園出口排隊＋監視器。放在 #view 外面，重畫路況時影像不會中斷
+const CAM_URL = "https://cctvn.freeway.gov.tw/abs2mjpg/bmjpg?camera=14750"
+const CAM_SECONDS = 30
+let camTimer = null
+function renderCam(p) {
+  const show = state.mode === "pm"
+  $("#cam").hidden = !show
+  if (!show) { stopCam(); return }
+  const q = (p && p.exits || []).find(x => x.name === "桃園")
+  $("#camq").textContent = q ? q.text : ""
+  $("#camq").className = "q" + (q ? (q.alert ? " bad" : " ok") : "")
+  $("#camq").hidden = !q
+}
+function stopCam() {
+  clearInterval(camTimer); camTimer = null
+  $("#camImg").removeAttribute("src")
+  $("#camFrame").hidden = true
+  $("#camBtn").textContent = `▶ 看即時監視器（${CAM_SECONDS} 秒）`
+}
+function playCam() {
+  if (camTimer) { stopCam(); return }
+  let left = CAM_SECONDS
+  $("#camImg").src = `${CAM_URL}&t=${Date.now()}`
+  $("#camFrame").hidden = false
+  $("#camBtn").textContent = "■ 停止"
+  $("#camLeft").textContent = `${left} 秒`
+  camTimer = setInterval(() => { if (--left <= 0) stopCam(); else $("#camLeft").textContent = `${left} 秒` }, 1000)
+}
+$("#camBtn").addEventListener("click", playCam)
 
 // 只讀取最近一次查詢的結果（不會叫 NAS 查，也不花推播額度）
 async function loadCached() {
@@ -240,7 +287,9 @@ document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click"
   loadCached()
 }))
 $("#refresh").addEventListener("click", refresh)
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadCached() })
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadCached(); else stopCam() })
+// 推播的「📷 桃園出口」按鈕會開 traffic.html#cam：切到下班並直接播放
+if (location.hash === "#cam") { state.mode = "pm"; render(); playCam(); $("#cam").scrollIntoView({ block: "start" }) }
 loadCached()
 </script>
 </body>
