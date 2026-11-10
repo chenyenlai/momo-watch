@@ -36,6 +36,10 @@ button:disabled { opacity:.5; cursor:default; }
 .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
 .bar { height:8px; border-radius:4px; background:var(--l0); overflow:hidden; display:flex; }
 .bar i { display:block; }
+.bar2 { display:flex; align-items:center; gap:8px; margin:4px 0; font-size:14px; }
+.bar2 span { width:4.8em; color:var(--muted); } .bar2 .bar { flex:1; } .bar2 b { width:4.2em; text-align:right; font-weight:600; color:var(--muted); }
+.parts { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:8px; margin:10px 0 8px; }
+.parts small { display:block; font-size:12px; color:var(--muted); }
 .badge { font-size:12px; font-weight:700; border-radius:999px; padding:2px 9px; white-space:nowrap; }
 .b0 { background:var(--l0); color:var(--muted); } .b1 { background:var(--l2); color:#7a5600; } .b2 { background:var(--l3); color:var(--ok); }
 /* 課程卡 */
@@ -225,8 +229,14 @@ const LIM = { pic: 8000, read: 8000, mean: 8000, hear: 8000, fill: 15000, listen
 function applyEv(e) {
   const s = S.it[e.h] || (S.it[e.h] = { box: 0, n: 0, ok: 0, bad: 0, fix: 0, last: 0 });
   s.n++; s.last = e.t;
+  if (e.m === 'lesson') {   // 練習：只記最後一次對不對（練習進度條），不影響測驗進度
+    s.pn = (s.pn || 0) + 1; s.pok = e.ok;
+    if (e.ok) { if (s.fix > 0) s.fix--; } else s.fix = 2;
+    return;
+  }
+  s.tn = (s.tn || 0) + 1;
   if (e.ok) { s.ok++; if (e.m === 'pass') s.box = Math.max(s.box + 1, 3); else if (e.ms < (LIM[e.type] || 10000)) s.box = Math.min(5, s.box + 1); if (s.fix > 0) s.fix--; }
-  else { s.bad++; s.box = 0; s.fix = 2; }
+  else { s.bad++; s.box = Math.min(s.box, 1); s.fix = 2; }   // 答錯退回黃色，再答對 2 次就熟
 }
 function rebuild() { S.log.sort((a, b) => a.t - b.t); S.it = {}; S.log.forEach(applyEv); }
 const evArr = (e) => [e.i, e.t, 'jp', e.h, e.type, e.a, e.ok, e.ms, e.m, e.qd, e.ad];
@@ -240,9 +250,19 @@ function record(it, type, a, ad, ok, ms, mode) {
 const st = (id) => S.it[id] || { box: 0, n: 0, fix: 0 };
 const lv = (id) => { const s = S.it[id]; if (!s || !s.n) return 0; if (s.fix > 0) return 1; return s.box >= 4 ? 4 : s.box >= 2 ? 3 : 2; };
 function lessonStat(L) {
-  const n = L.items.length, seen = L.items.filter(i => st(i.id).n).length, good = L.items.filter(i => st(i.id).box >= 3).length, fix = L.items.filter(i => st(i.id).fix > 0).length;
-  return { n, seen, good, fix, pass: !!S.pass[L.no] };
+  const its = L.items, n = its.length, c = (f) => its.filter(i => f(st(i.id))).length;
+  return { n, seen: c(s => s.n), fix: c(s => s.fix > 0),
+    pGood: c(s => s.pok), pSeen: c(s => s.pn),             // 練習：最後一次答對
+    good: c(s => s.box >= 3), tSeen: c(s => s.tn || s.box), // 測驗：照熟練規則
+    pass: !!S.pass[L.no] };
 }
+function practiceParts(L) {   // 練習：全部題目各出一次，超過 12 題就拆成 練習 1、練習 2…
+  const n = L.items.length, k = Math.ceil(n / 12), z = Math.ceil(n / k), out = [];
+  for (let i = 0; i < n; i += z) out.push(L.items.slice(i, i + z));
+  return out;
+}
+const partDone = (its) => its.every(i => st(i.id).pok);
+const firstPart = (L) => { const ps = practiceParts(L), k = ps.findIndex(p => !partDone(p)); return k < 0 ? 1 : k + 1; };
 
 // ---------- 同步 ----------
 let syncMsg = '', syncing = null;
@@ -282,7 +302,7 @@ function route() {
   audio.pause();
   const h = location.hash.slice(1), [p, a] = h.split('/');
   if (p === 'L' && BYL[a]) learn(BYL[a]);
-  else if (p === 'P' && BYL[a]) quiz('lesson', BYL[a]);
+  else if (p === 'P' && BYL[a]) quiz('lesson', BYL[a], Math.min(+h.split('/')[2] || firstPart(BYL[a]), practiceParts(BYL[a]).length));
   else if (p === 'T' && BYL[a]) quiz('pass', BYL[a]);
   else if (p === 'mix') quiz('mix');
   else if (p === 'fix') quiz('fix');
@@ -296,6 +316,9 @@ function route() {
 }
 window.addEventListener('hashchange', route);
 
+function bar2(label, g, seen, n) {   // 綠＝答對、黃＝做過但還沒對、灰＝還沒做
+  return '<div class="bar2"><span>' + label + '</span><div class="bar"><i style="width:' + g / n * 100 + '%;background:var(--l4)"></i><i style="width:' + Math.max(0, seen - g) / n * 100 + '%;background:var(--l2)"></i></div><b>' + g + ' / ' + n + '</b></div>';
+}
 function home() {
   const all = Object.values(ITEMS), fixN = all.filter(i => st(i.id).fix > 0).length, studied = all.filter(i => st(i.id).n).length;
   const today = new Date().toDateString(), todayN = S.log.filter(e => new Date(e.t).toDateString() === today).length;
@@ -310,9 +333,9 @@ function home() {
     const badge = s.pass ? '<span class="badge b2">✅ 已通過</span>' : s.seen ? '<span class="badge b1">學習中</span>' : '<span class="badge b0">還沒開始</span>';
     return '<div class="card les"><div class="hd"><span><span class="no">' + LN(L) + '</span><h3>' + esc(L.title) + '</h3></span>' + badge + '</div>' +
       '<div class="goals">' + L.goals.map(g => '<span>' + g.no + ' ' + esc(g.title) + '</span>').join('') + '</div>' +
-      '<div class="bar"><i style="width:' + s.good / s.n * 100 + '%;background:var(--l4)"></i><i style="width:' + (s.seen - s.good) / s.n * 100 + '%;background:var(--l2)"></i></div>' +
-      '<div class="muted">熟練 ' + s.good + ' / ' + s.n + (s.fix ? '・錯題 ' + s.fix : '') + '</div>' +
-      '<div class="row3"><button class="ghost" onclick="location.hash=\'L/' + no + '\'">📖 重點</button><button class="ghost" onclick="location.hash=\'P/' + no + '\'">✏️ 練習</button><button class="ghost" onclick="location.hash=\'T/' + no + '\'">⚡ 測驗</button></div>' +
+      bar2('✏️ 練習', s.pGood, s.pSeen, s.n) + bar2('⚡ 測驗', s.good, s.tSeen, s.n) +
+      '<div class="parts">' + practiceParts(L).map((ps, k) => { const g = ps.filter(i => st(i.id).pok).length; return '<button class="ghost" onclick="location.hash=\'P/' + no + '/' + (k + 1) + '\'">' + (partDone(ps) ? '✅ ' : '✏️ ') + '練習' + (practiceParts(L).length > 1 ? ' ' + (k + 1) : '') + '<small>' + g + ' / ' + ps.length + '</small></button>'; }).join('') + '</div>' +
+      '<div class="row2"><button class="ghost" onclick="location.hash=\'L/' + no + '\'">📖 重點</button><button class="ghost" onclick="location.hash=\'T/' + no + '\'">⚡ 測驗</button></div>' +
       (L.video ? '<button class="ghost" onclick="location.hash=\'V/' + no + '\'">📺 影片／🎧 只聽聲音（' + (L.video.length > 1 ? L.video.length + ' 集，' : '') + '約 ' + Math.round(L.video[0].min) + ' 分鐘）</button>' : '') +
       (L.lab ? '<button class="ghost" onclick="location.hash=\'lab/' + L.lab.id + '\'">🎮 ' + esc(L.lab.title) + '</button>' : '') + '</div>';
   };
@@ -365,20 +388,17 @@ function watch(L) {
 
 // ---------- 出題 ----------
 function pool(L) { return L ? L.items : Object.values(ITEMS).filter(i => st(i.id).n); }
-function buildRound(mode, L) {
-  const items = mode === 'lesson' || mode === 'pass' ? L.items : pool();
+function buildRound(mode, L, part, only) {
+  if (mode === 'lesson') return R.shuffle(only || practiceParts(L)[part - 1]).map(it => ({ it, type: R.pick(typesOf(it)), intro: !st(it.id).n }));
+  const items = mode === 'pass' ? L.items : pool();
   if (mode === 'fix') return R.shuffle(Object.values(ITEMS).filter(i => st(i.id).fix > 0)).slice(0, 10).map(it => ({ it, type: R.pick(typesOf(it)) }));
   if (mode === 'pass') {
-    const w = R.shuffle(L.items.filter(i => i.kind === 'w')).slice(0, 6), s = R.shuffle(L.items.filter(i => i.kind === 's')).slice(0, 6);
+    const six = (k) => R.shuffle(L.items.filter(i => i.kind === k)).sort((a, b) => (st(a.id).box >= 3) - (st(b.id).box >= 3)).slice(0, 6);   // 還沒綠的先出
+    const w = six('w'), s = six('s');
     return R.shuffle(w.concat(s)).map(it => ({ it, type: R.pick(typesOf(it).filter(t => t !== 'hear') ) || 'mean', test: true }));
   }
   const out = [], used = new Set(), add = (it, intro) => { if (used.has(it.id) || out.length >= 10) return; used.add(it.id); out.push({ it, type: R.pick(typesOf(it)), intro }); };
   R.shuffle(items.filter(i => st(i.id).fix > 0)).slice(0, 3).forEach(it => add(it));
-  if (mode === 'lesson') {
-    const fresh = items.filter(i => !st(i.id).n);
-    fresh.filter(i => i.kind === 'w').slice(0, 4).forEach(it => add(it, true));
-    fresh.filter(i => i.kind === 's').slice(0, 2).forEach(it => add(it, true));
-  }
   const w = (it) => { const s = st(it.id); if (!s.n) return mode === 'lesson' ? 1 : -1; return (5 - Math.min(5, s.box)) * 2 + Math.min(6, (Date.now() - s.last) / 864e5) * 1.5 + Math.random() * 2; };
   items.filter(i => w(i) >= 0).sort((a, b) => w(b) - w(a)).forEach(it => add(it));
   return out;
@@ -402,12 +422,12 @@ function makeQ(it, type) {
   return { it, type, opts };
 }
 
-function quiz(mode, L) {
-  const qs = buildRound(mode, L);
+function quiz(mode, L, part, only) {
+  const qs = buildRound(mode, L, part, only), nParts = L ? practiceParts(L).length : 0;
   preload(qs.map(q => q.it.id));
   const back = L ? '#L/' + L.no : '#';
   if (!qs.length) { app.innerHTML = '<div class="top"><a href="#">← 課程列表</a></div><div class="card">' + (mode === 'fix' ? '錯題本是空的 🎉' : '還沒有練過的題目，先去練一課吧。') + '</div>'; return; }
-  const title = mode === 'pass' ? '⚡ 通過測驗' : mode === 'mix' ? '🔁 綜合複習' : mode === 'fix' ? '📒 錯題本' : '✏️ 練習';
+  const title = mode === 'pass' ? '⚡ 通過測驗' : mode === 'mix' ? '🔁 綜合複習' : mode === 'fix' ? '📒 錯題本' : '✏️ 練習' + (nParts > 1 ? ' ' + part : '') + (only ? '・只練錯的' : '');
   let i = 0, score = 0, wrongs = [];
   const header = () => '<div class="top"><a href="' + back + '">← ' + (L ? LN(L) : '課程列表') + '</a><span class="muted">' + title + '</span></div>' +
     '<div class="hud"><span>' + (i + 1) + ' / ' + qs.length + '</span><span>答對 ' + score + '</span></div><div class="bar"><i style="width:' + i / qs.length * 100 + '%;background:var(--blue)"></i></div>';
@@ -496,8 +516,12 @@ function quiz(mode, L) {
     const ws = [...new Set(wrongs)];
     app.innerHTML = '<div class="top"><a href="' + back + '">← ' + (L ? LN(L) : '課程列表') + '</a></div><div class="card" style="text-align:center"><div style="font-size:46px">' + (score >= qs.length * 0.8 ? '🎉' : '💪') + '</div><h1>答對 ' + score + ' / ' + qs.length + '</h1>' + extra +
       (ws.length ? '<div style="text-align:left;margin-top:10px"><h2>這回合答錯的（已放進錯題本）</h2>' + ws.map(it => '<div style="padding:4px 0;border-top:1px solid var(--line)">' + (it.kind === 'w' ? '<span class="jp">' + esc(it.k) + (it.k !== it.r ? '（' + esc(it.r) + '）' : '') + '</span> ' + esc(it.zh) : '<span class="jp">' + ruby(it.jp) + '</span><br><span class="muted">' + esc(it.zh) + '</span>') + '</div>').join('') + '</div>' : '') +
-      '<div class="row2" style="margin-top:14px"><button class="big" id="again">再一回合 ↺</button><button class="ghost" onclick="location.hash=\'\'">課程列表</button></div></div>';
-    app.querySelector('#again').onclick = () => quiz(mode === 'pass' && score >= qs.length * 0.8 ? 'lesson' : mode, L);
+      (mode === 'lesson' ? '<div class="row2" style="margin-top:14px">' + (ws.length ? '<button class="big" id="again">🔁 只練錯的 ' + ws.length + ' 題</button>' : '') +
+          (part < nParts ? '<button class="' + (ws.length ? 'ghost' : 'big') + '" onclick="location.hash=\'P/' + L.no + '/' + (part + 1) + '\'">練習 ' + (part + 1) + ' →</button>' : '<button class="' + (ws.length ? 'ghost' : 'big') + '" onclick="location.hash=\'T/' + L.no + '\'">⚡ 去測驗</button>') +
+          '</div><button class="ghost" style="width:100%;margin-top:8px" onclick="location.hash=\'\'">課程列表</button></div>'
+        : '<div class="row2" style="margin-top:14px"><button class="big" id="again">再一回合 ↺</button><button class="ghost" onclick="location.hash=\'\'">課程列表</button></div></div>');
+    const ag = app.querySelector('#again');
+    if (ag) ag.onclick = () => mode === 'lesson' ? quiz('lesson', L, part, ws) : quiz(mode === 'pass' && score >= qs.length * 0.8 ? 'mix' : mode, L);
     sync();
   }
   show();
