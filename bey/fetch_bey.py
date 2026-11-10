@@ -4,7 +4,9 @@
 來源（robots.txt 都允許抓取；只抓公開頁面，每頁間隔幾秒）：
   BeybladeHub 上蓋資料庫  型號、中文／英文／日文名、類型、重量
   BeybladeHub T 表        強度分級（TIER_URL，台灣玩家依比賽環境排的）
+  BeybladeHub 商品頁      中文商品名、台灣售價、發售日；抽抽包（隨機強化組）有哪幾款、官方稀有款
   BEYWATCH.GG 每顆上蓋頁  全球比賽前幾名的使用率、冠軍率、排名（熱門度），以及商品型號 → 內含哪些上蓋
+  BEYWATCH.GG 固鎖、軸心頁 使用率（熱門的固鎖／軸心）；稀有度由「出現在幾個商品」算出
 
 用法：
   python3 bey/fetch_bey.py                 抓全部，寫到 docs/bey/data.json
@@ -26,9 +28,11 @@ DELAY = 2  # 每頁間隔秒數，別給人家網站添麻煩
 
 HUB = 'https://beybladehub.app'
 HUB_BLADES = HUB + '/parts/blades'
+HUB_SITEMAP = HUB + '/sitemap.xml'
 TIER_URL = HUB + '/t/4Xuagf8J'  # 10 月份 T 度排行（使用者指定）；要換別張 T 表改這裡
 BW = 'https://beywatch.gg'
 BW_SITEMAP = BW + '/sitemaps/blades.xml'
+BW_PARTS = BW + '/sitemaps/parts.xml'
 TW = timezone(timedelta(hours=8))
 CACHE = None
 
@@ -121,13 +125,18 @@ def parse_tier(page):
     if i < 0:
         raise ValueError('T 表格式變了：找不到 board')
     board, _ = json.JSONDecoder().raw_decode(data, i)
-    tab = next((t for t in board['board']['tabs'] if t.get('id', '').startswith('blade')), None)
-    if not tab:
+    def rows_of(prefix):
+        tab = next((t for t in board['board']['tabs'] if t.get('id', '').startswith(prefix)), None)
+        if not tab:
+            return []
+        rows = [{'label': r['label'],
+                 'cards': [{'id': c['id'], 'name': c.get('name'), 'parts': [p['label'] for p in c.get('parts') or []]}
+                           for c in r.get('cards') or []]}
+                for r in tab['rows']]
+        return [r for r in rows if r['cards']]
+    rows = rows_of('blade_atomic') or rows_of('blade')
+    if not rows:
         raise ValueError('T 表沒有上蓋分頁')
-    rows = [{'label': r['label'],
-             'cards': [{'id': c['id'], 'name': c.get('name'), 'parts': [p['label'] for p in c.get('parts') or []]}
-                       for c in r.get('cards') or []]}
-            for r in tab['rows']]
     meta = text_of(page)
     author = re.search(r'玩家 T 表 .+? (\S+(?: \S+)?) 最後更新', meta)
     updated = re.search(r'最後更新 (\d{4})年(\d{1,2})月(\d{1,2})日', meta)
@@ -135,7 +144,60 @@ def parse_tier(page):
         'title': html.unescape(title.group(1)).strip() if title else '',
         'author': author.group(1) if author else '',
         'updated': '%s-%02d-%02d' % (updated.group(1), int(updated.group(2)), int(updated.group(3))) if updated else '',
-        'rows': [r for r in rows if r['cards']],
+        'rows': rows, 'ratchets': rows_of('ratchet'), 'bits': rows_of('bit'),
+    }
+
+
+def split_config(cfg):
+    """'4-60D' → (None, '4-60', 'D')；CX 'W5-80WB' → ('W', '5-80', 'WB')；'ATr'（固鎖一體軸心）→ ('A', None, 'Tr')"""
+    cfg = re.sub(r'（.*?）|\(.*?\)', '', cfg or '').strip()
+    m = re.match(r'^([A-Z]{0,2}?)(M-\d{2}|\d-\d{2})([A-Z][A-Za-z]*)$', cfg)
+    if m:
+        return m.group(1) or None, m.group(2), m.group(3)
+    m = re.match(r'^([A-Z])([A-Z][a-z]+)$', cfg)
+    if m:
+        return m.group(1), None, m.group(2)
+    return None, None, None
+
+def parse_hub_product(page):
+    """BeybladeHub 商品頁（/parts/combos/型號）→ 商品資料；抽抽包另外列出每一款"""
+    # 標題有兩種：「名稱（型號）｜…」和「型號 名稱｜…」
+    t = re.search(r'<title>(.+?)（([^）]+)）｜', page)
+    t2 = re.search(r'<title>([BUC]XH?-[\w-]+) (.+?)｜', page)
+    if t:
+        zh, code = t.group(1), t.group(2)
+    elif t2:
+        zh, code = t2.group(2), t2.group(1)
+    else:
+        return None
+    s = text_of(page)
+    m = lambda rx: re.search(rx, s)
+    kind = m(r'([BUC]X \S+線) ・ (\S+)')
+    price = m(r'台灣 NT\$ ([\d,]+)')
+    release = m(r'發售日 (\d{4}-\d{2}-\d{2})')
+    config = m(r'原裝配置 (\S+)')
+    blade = m(r'規格速覽.*?上蓋 (\S+?)（')
+    variants = []
+    i = page.find('包含款式')
+    if i >= 0:
+        block = page[i:page.find('回完整陀螺列表', i)]
+        for item in re.split(r'<span translate="no"[^>]*>\d{2}</span>', block)[1:]:
+            divs = [text_of(x) for x in re.findall(r'<div[^>]*>([^<]*)</div>', item)]
+            divs = [x for x in divs if x]
+            if not divs:
+                continue
+            note = divs[2] if len(divs) > 2 else ''
+            variants.append({'name': divs[0], 'en': divs[1] if len(divs) > 1 else '', 'note': note,
+                             'rare': bool(re.search(r'<span[^>]*>R</span>', item[:300])) or 'RARE' in note or '籤王' in note})
+    return {
+        'zh': html.unescape(zh).strip(), 'code': code.strip(),
+        'line': kind.group(1) if kind else '', 'kind': kind.group(2) if kind else '',
+        'price': int(price.group(1).replace(',', '')) if price else None,
+        'release': release.group(1) if release else '', 'config': config.group(1) if config else '',
+        'blade': blade.group(1) if blade else '', 'variants': variants,
+        # 說明裡出現的所有配置（一盒多顆的套組、CX 沒有「原裝配置」欄位時用來算零件稀有度）
+        'configs': sorted(set(re.findall(r'(?<![\w-])([A-Z]{0,2}(?:\d|M)-\d{2}[A-Z][A-Za-z]{0,2})(?![\w-])',
+                                         s.split('相關商品')[0]))),
     }
 
 # ---------------------------------------------------------------------------
@@ -171,6 +233,24 @@ def parse_bw_blade(page):
         'recent': {'first': pct(recent.group(1)), 'cuts': int(recent.group(2).replace(',', '')),
                    'rank': int(recent.group(3)), 'of': int(recent.group(4))} if recent else None,
         'products': products,
+    }
+
+
+def parse_bw_part(page):
+    """BEYWATCH 固鎖／軸心頁 → {kind, name, abbr, grade, rank, usage, first, cuts}"""
+    s = text_of(page)
+    head = re.search(r'Parts / (Ratchets|Bits) / (.+?) \2(?: \(([^)]+)\))? (\S+) (?:Ratchet|Bit)', s)
+    if not head:
+        return None
+    m = lambda rx: re.search(rx, s)
+    rank, first, usage, cuts = m(r'Rank #(\d+)'), m(r'1st Place Rate i ([\d.]+)%'), m(r'Usage i ([\d.]+)%'), m(r'Top Cuts ([\d,]+)')
+    return {
+        'kind': 'ratchet' if head.group(1) == 'Ratchets' else 'bit',
+        'name': head.group(2), 'abbr': head.group(3) or head.group(2), 'grade': head.group(4),
+        'rank': int(rank.group(1)) if rank else None,
+        'usage': pct(usage.group(1)) if usage else None,
+        'first': pct(first.group(1)) if first else None,
+        'cuts': int(cuts.group(1).replace(',', '')) if cuts else None,
     }
 
 
@@ -220,12 +300,78 @@ def build():
     if missing:
         print('BEYWATCH 有、BeybladeHub 對不到的上蓋：', '、'.join(missing), file=sys.stderr)
 
+    # BeybladeHub 商品頁：中文、台灣售價、抽抽包內容（有的話蓋過 BEYWATCH 的商品資料）
+    by_zh = {}
+    for b in blades:
+        by_zh.setdefault(b['zh'], b)
+    cx_main = [b for b in blades if b.get('part') in ('主刃', '金屬戰刃')]
+    def blade_of(name):
+        word = re.sub(r'（.*?）', '', name.split(' ')[0])
+        if word in by_zh:
+            return by_zh[word]['id']
+        # CX 的名字是「紋章＋主刃」（魔犬＋烈焰）：用主刃對
+        main = next((b for b in sorted(cx_main, key=lambda b: -len(b['zh'])) if word.endswith(b['zh'])), None)
+        return main['id'] if main else None
+    urls = [u for u in re.findall(r'<loc>([^<]+)</loc>', get(HUB_SITEMAP)) if '/parts/combos/' in u and '/en/' not in u]
+    hub_n = 0
+    for url in urls:
+        try:
+            p = parse_hub_product(get(url))
+        except Exception as e:
+            print('商品頁解析失敗', url, type(e).__name__, file=sys.stderr)
+            continue
+        if not p or not re.match(r'[BUC]XH?-\d', p['code']):
+            continue
+        hub_n += 1
+        for v in p['variants']:
+            v['blade'] = blade_of(v['name'])
+        old = products.get(p['code'], {})
+        ids = [v['blade'] for v in p['variants'] if v['blade']] or ([blade_of(p['blade'])] if blade_of(p['blade']) else [])
+        products[p['code']] = {
+            'name': p['zh'], 'en': old.get('name', ''), 'maker': 'Takara Tomy', 'line': p['line'], 'kind': p['kind'],
+            'price': p['price'], 'release': p['release'], 'config': p['config'],
+            'blades': list(dict.fromkeys(ids + old.get('blades', []))),
+            'random': len(p['variants']) > 1, 'variants': p['variants'], 'url': url, 'configs': p['configs'],
+        }
+    if hub_n < 50:
+        raise SystemExit('BeybladeHub 商品頁只解析到 %d 個，格式可能變了' % hub_n)
+
+    # 固鎖、軸心：BEYWATCH 使用率＋T 表的軸心分級＋出現在哪些商品（越少越稀有）
+    parts = {'ratchet': {}, 'bit': {}}
+    for url in re.findall(r'<loc>([^<]+)</loc>', get(BW_PARTS)):
+        if not re.search(r'/parts/(ratchet|bit)-', url):
+            continue
+        try:
+            pt = parse_bw_part(get(url))
+        except Exception as e:
+            print('零件頁解析失敗', url, type(e).__name__, file=sys.stderr)
+            continue
+        if pt:
+            parts[pt['kind']][pt['abbr']] = {k: pt[k] for k in ('name', 'grade', 'rank', 'usage', 'first', 'cuts')}
+            parts[pt['kind']][pt['abbr']]['in'] = []
+    for kind in ('ratchet', 'bit'):
+        n = len(tier[kind + 's'])
+        for i, row in enumerate(tier[kind + 's']):
+            for c in row['cards']:
+                d = parts[kind].setdefault(c['id'], {'name': c['id'], 'in': []})
+                d.setdefault('tier', {'label': row['label'], 'level': i, 'of': n})
+    for code, p in products.items():
+        configs = [v['name'].split(' ', 1)[1] for v in p.get('variants') or [] if ' ' in v['name']]
+        for cfg in configs + [p.get('config')] + p.pop('configs', []):
+            _, r, b = split_config(cfg)
+            for kind, key in (('ratchet', r), ('bit', b)):
+                if key:
+                    d = parts[kind].setdefault(key, {'name': key, 'in': []})
+                    if code not in d['in']:
+                        d['in'].append(code)
+
     return {
         'updated': datetime.now(TW).strftime('%Y-%m-%d %H:%M'),
         'tier': {'title': tier['title'], 'author': tier['author'], 'updated': tier['updated'], 'url': TIER_URL,
-                 'labels': [r['label'] for r in tier['rows']]},
+                 'labels': [r['label'] for r in tier['rows']], 'bitLabels': [r['label'] for r in tier['bits']]},
         'usage': {'url': BW, 'through': through},
         'blades': blades,
+        'parts': parts,
         'products': {k: v for k, v in products.items() if re.match(r'[BUC]XH?-\d', k)},  # 只留日版型號
     }
 

@@ -83,6 +83,20 @@ form.rec .actions { grid-column: 1 / -1; margin-top: 0; }
 .mine .when { font-size: 13px; color: var(--muted); }
 .mine button { grid-row: 1 / 3; grid-column: 2; align-self: center; border: 0; background: none; color: var(--muted);
   font: inherit; font-size: 13px; cursor: pointer; padding: 6px; }
+.vars { margin: 10px 0 0; padding: 0; list-style: none; font-size: 14px; }
+.vars li { padding: 6px 0; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: baseline; }
+.vars li:first-child { border-top: 0; }
+.vars .t { margin-left: auto; font-weight: 700; flex-shrink: 0; }
+.mark { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.mark.rare { background: var(--warn-bg); color: var(--warn); }
+.mark.best { background: var(--ok-bg); color: var(--ok); }
+.mark.hot { background: var(--bad-bg); color: var(--bad); }
+.mark.gem { background: #e9e0ff; color: #5b3cc4; }
+@media (prefers-color-scheme: dark) { .mark.gem { background: #33285a; color: #c8b8ff; } }
+.vars li { flex-wrap: wrap; }
+.legend { font-size: 12px; color: var(--muted); margin-top: 6px; }
+form.rec select { font: inherit; font-size: 15px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); min-width: 0; width: 100%; }
 .empty { color: var(--muted); text-align: center; padding: 24px 0; }
 #sync { color: var(--muted); font-size: 13px; margin: 0 2px; min-height: 20px; }
 footer { color: var(--muted); font-size: 12px; margin-top: 20px; line-height: 1.7; }
@@ -166,6 +180,39 @@ function hot(st) {
 }
 
 const isChip = (b) => b.part === '鎖定紋章';
+
+// ---------- 固鎖、軸心：熱門（國外比賽使用率）、稀有（很少商品有） ----------
+const HOT = { ratchet: 20, bit: 20 };   // 使用率 % 達到就算熱門
+function splitCfg(cfg) {   // '4-60D' → ['4-60', 'D']；'W5-80WB' → ['5-80', 'WB']；'ATr' → [null, 'Tr']
+  cfg = String(cfg || '').replace(/（.*?）|\(.*?\)/g, '').trim();
+  let m = cfg.match(/^([A-Z]{0,2}?)(M-\d{2}|\d-\d{2})([A-Z][A-Za-z]*)$/);
+  if (m) return [m[2], m[3]];
+  m = cfg.match(/^([A-Z])([A-Z][a-z]+)$/);
+  return m ? [null, m[2]] : [null, null];
+}
+function partNote(kind, key) {
+  const d = ((D.parts || {})[kind] || {})[key];
+  if (!d) return null;
+  const hot = d.usage != null && d.usage >= HOT[kind];
+  const n = (d.in || []).length, gem = n > 0 && n <= 2;
+  const label = kind === 'bit' && d.name && d.name !== key ? key + '（' + d.name + '）' : key;
+  return { key, kind, d, hot, gem, n, label };
+}
+function cfgMarks(cfg) {
+  const [r, b] = splitCfg(cfg);
+  return [partNote('ratchet', r), partNote('bit', b)].filter(Boolean).map(p =>
+    p.hot || p.gem ? `<span class="mark ${p.hot ? 'hot' : 'gem'}">${p.hot ? '🔥' : ''}${p.gem ? '💎' : ''} ${esc(p.key)}${p.n === 1 ? ' 只有這包' : ''}</span>` : '').join('');
+}
+function cfgRows(cfg) {   // 單售商品：原裝固鎖、軸心的說明
+  const [r, b] = splitCfg(cfg);
+  return [partNote('ratchet', r), partNote('bit', b)].filter(Boolean).map(p => {
+    const bits = [];
+    if (p.d.tier) bits.push('T 表 ' + p.d.tier.label);
+    if (p.d.usage != null) bits.push((p.hot ? '🔥 熱門，' : '') + '國外比賽 ' + p.d.usage + '% 組合在用');
+    if (p.n) bits.push(p.gem ? '💎 少見：只有 ' + p.n + ' 個商品有' : p.n + ' 個商品有');
+    return `<dt>${p.kind === 'ratchet' ? '固鎖' : '軸心'}</dt><dd>${esc(p.label)}${bits.length ? '：' + esc(bits.join('，')) : ''}</dd>`;
+  }).join('');
+}
 // 商品名稱：CX 是「鎖定紋章＋主刃」（天馬＋爆擊＝天馬爆擊），其他就是上蓋的名字
 function prodName(c, blades) {
   const chip = blades.find(isChip), main = blades.find(b => b.part === '主刃' || b.part === '金屬戰刃');
@@ -212,6 +259,11 @@ function beyCard(b, rec) {
   if (t && t.parts && t.parts.length) x += `<dt>推薦搭配</dt><dd>${esc(t.parts.join('、'))}</dd>`;
   x += `<dt>熱門度</dt><dd>${esc(h.text)}</dd>`;
   if (st && st.first != null) x += `<dt>冠軍率</dt><dd>${st.first}%` + (st.recent ? `（近 90 天第 ${st.recent.rank} 名／${st.recent.of} 顆）` : '') + `</dd>`;
+  const packs = Object.entries(D.products).filter(([c, p]) => p.random && (p.blades || []).includes(b.id));
+  if (packs.length) x += `<dt>抽抽包</dt><dd>${packs.map(([c, p]) => {
+    const v = p.variants.find(v => v.blade === b.id);
+    return esc(c + ' ' + p.name) + (v ? '（' + esc(v.name.split(' ').slice(1).join(' ')) + (v.rare ? '，官方稀有' : '') + '）' : '');
+  }).join('、')} 可能抽到</dd>`;
   x += `</dl>`;
   x += `<div class="verdict ${v.cls}">${esc(v.title)}<small>${esc(v.why)}</small></div>`;
   x += `<div class="actions"><button class="btn${v.cls === 'own' ? ' ghost' : ''}" data-buy="${esc(key)}">＋我買了</button>`;
@@ -225,6 +277,8 @@ function beyCard(b, rec) {
 function recForm(key, rec) {
   return `<form class="rec" data-key="${esc(key)}">
     <label>買了</label><div><b>${esc(rec.code ? rec.code + ' ' : '')}${esc(rec.name)}</b></div>
+    ${rec.variants ? `<label for="f-v">抽到</label><select id="f-v" name="v">${rec.variants.map((v, i) =>
+      `<option value="${i}">${esc(v.name)}${v.rare ? '（稀有）' : ''}</option>`).join('')}<option value="">還沒拆／不知道</option></select>` : ''}
     <label for="f-d">日期</label><input id="f-d" name="d" type="date" value="${today()}">
     <label for="f-p">價格</label><input id="f-p" name="p" type="number" inputmode="numeric" placeholder="可不填">
     <label for="f-n">備註</label><input id="f-n" name="n" placeholder="例如 MOMO、門市、送禮">
@@ -261,16 +315,58 @@ function render() {
     x += `</div>`;
   } else if (r.code) {
     if (r.prod || r.blades.length > 1) {
-      const key = 'p:' + r.code, name = prodName(r.code, r.blades);
-      recTargets[key] = { code: r.code, name, blades: r.blades.map(b => b.id), key };
-      // 整包怎麼判斷：看裡面最強的零件（鎖定紋章不算）
-      const best = r.blades.filter(b => !isChip(b)).sort((a, b) => (a.tier ? a.tier.level : 99) - (b.tier ? b.tier.level : 99))[0];
-      const v = best ? verdict(best) : null;
-      x += `<div class="card"><h2>商品</h2><div class="prod"><b>${esc(r.code)} ${esc(name)}</b>`;
-      if (r.prod) x += `<br>${esc(r.prod.name)}（${esc(r.prod.maker)}）`;
-      x += `<br>內含：${r.blades.map(b => esc(b.zh) + (b.tier ? ' ' + esc(b.tier.label) : isChip(b) ? '（紋章）' : '')).join('、')}</div>`;
-      if (v && r.blades.length > 1) x += `<div class="verdict ${v.cls}">${esc(v.title)}<small>${esc(best.zh)}：${esc(v.why)}</small></div>`;
-      x += `<div class="actions"><button class="btn" data-buy="${esc(key)}">＋我買了這個商品</button></div>`;
+      const P = r.prod || {}, key = 'p:' + r.code;
+      const name = P.kind ? P.name : prodName(r.code, r.blades);
+      recTargets[key] = { code: r.code, name, blades: r.blades.map(b => b.id), key, variants: P.random ? P.variants : null };
+      const lvOf = (b) => b && b.tier ? b.tier.level : 99;
+      x += `<div class="card"><h2>${P.random ? '🎲 抽抽包' : '商品'}</h2><div class="prod"><b>${esc(r.code)} ${esc(name)}</b>`;
+      const info = [P.kind, P.price ? 'NT$' + P.price : '', P.release ? P.release.slice(0, 7).replace('-', '/') + ' 發售' : ''].filter(Boolean);
+      if (info.length) x += `<br>${esc(info.join('・'))}`;
+      if (P.random) {
+        // 每一款：強度、官方稀有、最值得抽
+        const vs = P.variants.map(v => ({ v, b: byId[v.blade] }));
+        const bestLv = Math.min(...vs.map(o => lvOf(o.b)));
+        const kinds = new Set(vs.map(o => o.v.blade));
+        x += `<br>${vs.length} 款隨機抽 1 款</div><ul class="vars">`;
+        for (const { v, b } of vs) {
+          const marks = (v.rare ? '<span class="mark rare">官方稀有</span>' : '') + (b && kinds.size > 1 && lvOf(b) === bestLv && bestLv < 99 ? '<span class="mark best">⭐ 最強</span>' : '');
+          const color = v.note && !v.rare && !/基本線$/.test(v.note) ? '<span class="mark">' + esc(v.note.replace(/^本包/, '')) + '</span>' : '';
+          x += `<li><span>${esc(v.name)}</span>${marks}${color}${cfgMarks(v.name.split(' ').slice(1).join(' '))}<span class="t lv${LV(b && b.tier)}">${b && b.tier ? esc(b.tier.label) : '—'}</span></li>`;
+        }
+        x += `</ul><div class="legend">右邊是上蓋強度・🔥 熱門的固鎖／軸心・💎 很少商品有的固鎖／軸心</div>`;
+        // 值得抽的固鎖、軸心
+        const extras = [];
+        for (const { v } of vs) {
+          const [rr, bb] = splitCfg(v.name.split(' ').slice(1).join(' '));
+          for (const p of [partNote('ratchet', rr), partNote('bit', bb)].filter(p => p && (p.hot || p.gem)))
+            if (!extras.some(e => e.p.key === p.key && e.p.kind === p.kind)) extras.push({ v, p });
+        }
+        const top = vs.filter(o => lvOf(o.b) === bestLv && bestLv < 99).map(o => o.b);
+        if (kinds.size === 1 && vs[0].b) {   // 每款都是同一顆，只差顏色或配置
+          const v = verdict(vs[0].b);
+          x += `<div class="verdict ${v.cls}">${esc(v.title)}<small>每款都是 ${esc(vs[0].b.zh)}，只差在顏色或配置：${esc(v.why)}</small></div>`;
+        } else if (top.length) {
+          const want = top[0], got = owned(want.id).length;
+          // 想確定拿到：優先推薦同型號的單售（UX-03），再來是其他非抽抽包
+          const others = Object.entries(D.products).filter(([c, p]) => !p.random && (p.blades || []).includes(want.id));
+          const single = others.find(([c]) => c === want.code);
+          x += `<div class="verdict maybe">🎲 碰運氣<small>最想抽的是 ${esc(want.zh)}（${esc(want.tier.label)}），機會大約 1/${vs.length}` +
+            (got ? '，你已經有 ' + esc(want.zh) + ' 了' : single ? '。想確定拿到，買單售的 ' + esc(single[0] + ' ' + single[1].name) + ' 比較穩' : '') + `</small></div>`;
+        }
+        if (extras.length) x += `<div class="verdict maybe">🔩 零件也值得抽<small>${extras.map(({ v, p }) =>
+          esc(v.name) + ' 的' + (p.kind === 'ratchet' ? '固鎖 ' : '軸心 ') + esc(p.label) + '（' +
+          [p.hot ? '熱門 ' + p.d.usage + '%' : '', p.gem ? (p.n === 1 ? '只有這包有' : '只有 ' + p.n + ' 個商品有') : ''].filter(Boolean).join('、') + '）').join('；')}</small></div>`;
+      } else {
+        const best = r.blades.filter(b => !isChip(b)).sort((a, b) => lvOf(a) - lvOf(b))[0];
+        const v = best ? verdict(best) : null;
+        if (P.en) x += `<br>${esc(P.en)}`;
+        x += `<br>內含：${r.blades.map(b => esc(b.zh) + (b.tier ? ' ' + esc(b.tier.label) : isChip(b) ? '（紋章）' : '')).join('、')}</div>`;
+        if (P.config) x += `<dl class="rows"><dt>原裝配置</dt><dd>${esc(P.config)} ${cfgMarks(P.config)}</dd>${cfgRows(P.config)}</dl>`;
+        if (v && r.blades.length > 1) x += `<div class="verdict ${v.cls}">${esc(v.title)}<small>${esc(best.zh)}：${esc(v.why)}</small></div>`;
+      }
+      x += `<div class="actions"><button class="btn" data-buy="${esc(key)}">＋我買了這個商品</button>`;
+      if (P.url) x += `<span class="links"><a href="${esc(P.url)}" target="_blank" rel="noopener">BeybladeHub</a></span>`;
+      x += `</div>`;
       if (openForm === key) x += recForm(key, recTargets[key]);
       x += `</div>`;
     }
@@ -323,7 +419,13 @@ document.addEventListener('submit', (e) => {
   const d = f.d.value ? new Date(f.d.value + 'T12:00:00') : new Date();
   const p = f.p.value.trim();
   openForm = null;
-  addRec({ t: d.getTime(), code: tgt.code || '', name: tgt.name, blades: tgt.blades, price: p === '' ? null : Number(p), note: f.n.value.trim() });
+  let name = tgt.name, blades = tgt.blades;
+  if (tgt.variants) {   // 抽抽包：只算抽到的那一顆
+    const v = tgt.variants[f.v.value];
+    name = tgt.name + (v ? '：抽到 ' + v.name : '（還沒拆）');
+    blades = v && v.blade ? [v.blade] : [];
+  }
+  addRec({ t: d.getTime(), code: tgt.code || '', name, blades, price: p === '' ? null : Number(p), note: f.n.value.trim() });
 });
 
 fetch('bey/data.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
