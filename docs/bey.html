@@ -544,7 +544,36 @@ function renderMine() {
 
 // ---------- 事件 ----------
 let timer = null;
-$('#q').addEventListener('input', () => { clearTimeout(timer); openForm = null; timer = setTimeout(render, 120); });
+// 上一頁：每次「點進去」都記一筆瀏覽紀錄，按上一頁回到表（和原本捲到的位置），不會跳出這頁
+function urlOf(q, pk) {
+  const u = new URLSearchParams();
+  if (q) u.set('q', q);
+  if (pk) u.set('id', pk);
+  return location.pathname + (u.toString() ? '?' + u : '');
+}
+function go(q, pk) {
+  history.replaceState(Object.assign({}, history.state, { y: window.scrollY }), '', location.href);
+  pick = pk || null; $('#q').value = q; openForm = null;
+  history.pushState({ q, pick: pick, y: 0, deep: true }, '', urlOf(q, pick));
+  render(); window.scrollTo(0, 0);
+}
+window.addEventListener('popstate', (e) => {
+  const st = e.state || {}, u = new URLSearchParams(location.search);
+  $('#q').value = st.q != null ? st.q : (u.get('q') || '');
+  pick = st.pick || u.get('id') || null; openForm = null;
+  render(); window.scrollTo(0, st.y || 0);
+});
+$('#q').addEventListener('input', () => {
+  clearTimeout(timer); openForm = null;
+  const q = $('#q').value.trim(), st = history.state || {};
+  if (!q && st.deep) { history.back(); return; }   // 清空搜尋框＝回上一頁
+  if (q && !st.deep) {   // 從首頁開始打字：記一筆，上一頁可以回首頁
+    history.replaceState(Object.assign({}, st, { y: window.scrollY }), '', location.href);
+    history.pushState({ q, deep: true }, '', urlOf(q));
+  } else history.replaceState(Object.assign({}, st, { q, pick: null }), '', urlOf(q));
+  pick = null;
+  timer = setTimeout(render, 120);
+});
 document.addEventListener('click', (e) => {
   if (e.target.closest('#pwBtn')) { askKey(); return; }
   const lf = e.target.closest('[data-l]');
@@ -555,10 +584,10 @@ document.addEventListener('click', (e) => {
   }
   const pk = e.target.closest('[data-pick]');
   if (pk && byId[pk.dataset.pick]) {
-    pick = pk.dataset.pick; $('#q').value = byId[pick].zh; openForm = null; render(); window.scrollTo(0, 0); return;
+    go(byId[pk.dataset.pick].zh, pk.dataset.pick); return;
   }
   const q = e.target.closest('[data-q]');
-  if (q) { $('#q').value = q.dataset.q; openForm = null; render(); return; }
+  if (q) { go(q.dataset.q); return; }
   const buy = e.target.closest('[data-buy]');
   if (buy) { openForm = openForm === buy.dataset.buy ? null : buy.dataset.buy; render(); const f = document.querySelector('form.rec input[name=p]'); if (f) f.focus(); return; }
   if (e.target.closest('[data-cancel]')) { openForm = null; render(); return; }
@@ -605,8 +634,9 @@ fetch('bey/data.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
     `熱門度、冠軍率：<a href="${esc(d.usage.url)}" target="_blank" rel="noopener">BEYWATCH.GG</a> 國外比賽統計（到 ${esc(d.usage.through)}）<br>` +
     (d.sheet ? `原裝配置、別名、比賽常勝組合：<a href="${esc(d.sheet.url)}" target="_blank" rel="noopener">stan-yao Beyblade X 天梯</a><br>` : '') +
     `型號、名稱：<a href="https://beybladehub.app/parts/blades" target="_blank" rel="noopener">BeybladeHub 上蓋資料庫</a>・每週自動更新，上次 ${esc(d.updated)}`;
-  const u = new URLSearchParams(location.search).get('q');
-  if (u) $('#q').value = u;
+  const us = new URLSearchParams(location.search), u = us.get('q');
+  if (u) { $('#q').value = u; pick = us.get('id'); }
+  history.replaceState({ q: u || '', pick, deep: false }, '', location.href);
   render();
 }).catch(() => { $('#view').innerHTML = '<p class="empty">資料載入失敗，稍後再試</p>'; renderMine(); });
 renderMine();
