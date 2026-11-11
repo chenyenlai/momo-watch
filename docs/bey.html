@@ -134,6 +134,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const norm = (s) => String(s || '').toLowerCase().replace(/[\s\-_.・·]/g, '');
 let D = null;            // data.json
 let byId = {};
+const CX = [];           // {name: '蒼龍勇氣', code: 'CX-01', main: 'cx-main-Br'}
 
 // ---------- 紀錄（先存這台，再同步到雲端） ----------
 let S = { recs: [], addQ: [], delQ: [] };
@@ -278,7 +279,10 @@ function beyCard(b, rec) {
   let x = `<article class="card bey"><div class="top"><div>`;
   x += `<div class="name">${esc(b.zh)}</div>`;
   x += `<div class="sub">${esc([b.code, b.en, b.ja].filter(Boolean).join('・'))}</div>`;
-  if (b.alias) x += `<div class="sub">也叫：${esc(b.alias.join('、'))}</div>`;
+  const cxn = [...new Set(CX.filter(e => e.main === b.id).map(e => e.name + '（' + e.code + '）'))];
+  if (cxn.length) x += `<div class="sub">組合名：${esc(cxn.join('、'))}</div>`;
+  const al = (b.alias || []).filter(a => !CX.some(e => e.name === a));
+  if (al.length) x += `<div class="sub">也叫：${esc(al.join('、'))}</div>`;
   x += `<div class="sub">${esc([b.type, b.spin, b.weight ? b.weight + ' g' : ''].filter(Boolean).join('・'))}</div></div>`;
   x += `<div class="tier lv${lv}">${t ? esc(t.label) : '—'}<small>強度</small></div></div>`;
   if (isChip(b)) {
@@ -366,9 +370,11 @@ function search(q) {
   if (parts.length && !/[^\x00-\x7f]/.test(raw) && raw.length <= 3) return { parts, blades: [] };   // 「LR」「1-60」只看零件
   let hit = D.blades.filter(b => b.zh.includes(raw) || norm(b.en).includes(n) || (b.ja && b.ja.includes(raw)) || norm(b.code) === n ||
     (b.alias || []).some(a => a.includes(raw)));
-  if (!hit.length) {   // CX 的名字＝紋章＋主刃（惡魔獵魂 → 獵魂）
-    const mains = D.blades.filter(b => b.part === '主刃' || b.part === '金屬戰刃');
-    hit = mains.filter(m => D.blades.some(c => isChip(c) && raw.startsWith(c.zh) && raw.slice(c.zh.length).startsWith(m.zh)));
+  if (!hit.some(b => b.zh === raw)) {   // CX 的名字＝紋章＋主刃（蒼龍勇氣、惡魔獵魂），打一半也算
+    const cx = CX.filter(e => raw.length >= 2 && (e.name.includes(raw) || raw.startsWith(e.name)));
+    const codes = [...new Set(cx.map(e => e.code))];
+    if (codes.length === 1 && !hit.length) return search(codes[0]);   // 只有一個商品：直接顯示那個商品
+    for (const e of cx) if (!hit.includes(byId[e.main])) hit.push(byId[e.main]);
   }
   hit.sort((a, b) => (a.tier ? a.tier.level : 99) - (b.tier ? b.tier.level : 99));
   return { parts, blades: hit.slice(0, 15) };
@@ -516,6 +522,18 @@ document.addEventListener('submit', (e) => {
 
 fetch('bey/data.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
   D = d; byId = Object.fromEntries(d.blades.map(b => [b.id, b]));
+  // CX 組合名清單：同型號的紋章＋主刃、商品裡的紋章＋主刃，加上抽抽包每款的名字
+  for (const m of d.blades) if ((m.part === '主刃' || m.part === '金屬戰刃') && m.code)
+    for (const c of d.blades) if (isChip(c) && c.code === m.code) CX.push({ name: c.zh + m.zh, code: m.code, main: m.id });
+  for (const [c, p] of Object.entries(d.products)) {
+    const bl = (p.blades || []).map(i => byId[i]).filter(Boolean);
+    const chip = bl.find(isChip), main = bl.find(b => b.part === '主刃' || b.part === '金屬戰刃');
+    if (chip && main && !p.random) CX.push({ name: chip.zh + main.zh, code: c, main: main.id });
+    for (const v of p.variants || []) {
+      const vb = byId[v.blade];
+      if (vb && (vb.part === '主刃' || vb.part === '金屬戰刃')) CX.push({ name: v.name.split(' ')[0].replace(/（.*?）/g, ''), code: c, main: vb.id });
+    }
+  }
   const t = d.tier;
   $('#foot').innerHTML = `強度：<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a>（${esc(t.author)}，${esc(t.updated)}）<br>` +
     `熱門度、冠軍率：<a href="${esc(d.usage.url)}" target="_blank" rel="noopener">BEYWATCH.GG</a> 國外比賽統計（到 ${esc(d.usage.through)}）<br>` +
