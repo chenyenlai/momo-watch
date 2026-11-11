@@ -12,6 +12,7 @@
 
 - MOMO 上的 funbox toys 品牌館：新品上架、預購商品開賣前提醒
 - FUNBOX 官網（shop.funbox.com.tw）：新品上架（補貨通知預設關閉，見 SHOP_RESTOCK）
+- 天成書店 TCSB（www.tcsb.com.tw 搜尋「戰鬥陀螺」）：新品上架、售完變可購買（見 TCSB_RESTOCK），每 2 分鐘最多查一次
 
 - 排程：在家裡 NAS 的 Docker 每分鐘執行 `momo_watch.py`（GitHub Actions 排程已停用）
 - `seen.json`：看過的商品與即將開賣清單

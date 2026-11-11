@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""戰鬥陀螺新品監測：MOMO 上的 FUNBOX（funbox toys 品牌館）和 FUNBOX 官網，有新品或補貨就推播到手機（ntfy）。
+"""戰鬥陀螺新品監測：MOMO 上的 FUNBOX（funbox toys 品牌館）、FUNBOX 官網和天成書店 TCSB，有新品或補貨就推播到手機（ntfy）。
 
 只用 Python 內建模組，NAS / Docker / 一般電腦都能跑。
 
@@ -45,6 +45,13 @@ SHOP_FEEDS = [
 ]
 SHOP_SKIP = ['APP兌換']
 SHOP_RESTOCK = False  # True = 庫存從 0 變有貨也通知
+
+# 天成書店 TCSB（tcsb.com.tw，Bagisto）：搜尋「戰鬥陀螺」，新品上架、售完變可購買都通知
+TCSB_QUERY = '戰鬥陀螺'
+TCSB_PAGES = 1       # 每頁 36 件（網站只接受 limit=36）；陀螺都排在第 1 頁
+TCSB_EVERY = 120     # 至少隔幾秒才查一次（太密會被回 429）
+TCSB_INCLUDE = ['beyblade', 'takara']  # 標題要有其中一個，排除同名的書、FUNKO 公仔、遊戲片
+TCSB_RESTOCK = True  # True = 售完變可購買也通知
 
 REMIND_BEFORE = int(os.environ.get('REMIND_BEFORE', '15'))  # 開賣前幾分鐘提醒；0 = 不提醒
 
@@ -226,6 +233,66 @@ def check_shop(state, dry_run=False):
             log('官網補貨：', k, it['name'])
 
 
+def fetch_tcsb():
+    found = {}
+    for page in range(1, TCSB_PAGES + 1):
+        url = 'https://www.tcsb.com.tw/api/products?query=%s&sort=created_at-desc&limit=36&page=%d' % (
+            urllib.parse.quote(TCSB_QUERY), page)
+        req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': 'application/json'})
+        data = json.loads(urllib.request.urlopen(req, timeout=30).read().decode('utf-8'))
+        for p in data.get('data', []):
+            name = (p.get('name') or '').strip()
+            if not any(k in name.lower() for k in TCSB_INCLUDE):
+                continue
+            final = ((p.get('prices') or {}).get('final') or {}).get('price')
+            found[str(p['id'])] = {
+                'name': name,
+                'price': final if final is not None else p.get('min_price'),
+                'saleable': bool(p.get('is_saleable')),
+                'url': 'https://www.tcsb.com.tw/' + (p.get('url_key') or p.get('sku') or ''),
+            }
+        if page >= (data.get('meta') or {}).get('last_page', 1):
+            break
+        time.sleep(1)
+    if not found:
+        raise RuntimeError('一件陀螺都沒抓到，可能網站改版')
+    return found
+
+
+def check_tcsb(state, dry_run=False):
+    """天成書店 TCSB：新陀螺上架時通知（TCSB_RESTOCK 開啟時，售完變可購買也通知）"""
+    if not dry_run:
+        if time.time() - state.get('tcsb_at', 0) < TCSB_EVERY - 5:
+            return
+        state['tcsb_at'] = time.time()
+    try:
+        found = fetch_tcsb()
+    except Exception as e:
+        log('TCSB 檢查失敗：', e)
+        return
+    if dry_run:
+        for k, it in found.items():
+            log('TCSB %s  $%s  %s  %s' % (k, it['price'], '可購買' if it['saleable'] else '售完', it['name']))
+        return
+    known = state.get('tcsb')
+    state['tcsb'] = {k: {'name': it['name'], 'saleable': it['saleable']} for k, it in found.items()}
+    if known is None:  # 第一次只記錄
+        log('TCSB 第一次執行，記錄 %d 件' % len(found))
+        return
+    for k, it in found.items():
+        msg = '%s\n$%s｜%s\n%s' % (short_name(it['name']), it['price'],
+                                    '可購買' if it['saleable'] else '售完／尚未開賣', it['url'])
+        if k not in known:
+            if it['saleable']:
+                notify('TCSB 新陀螺上架，可購買！快搶', msg, click=it['url'], tags=['rotating_light'], priority=5)
+            else:
+                notify('TCSB 新陀螺上架', msg, click=it['url'], tags=['tada'], priority=4)
+            log('TCSB 新品：', k, it['name'])
+        elif TCSB_RESTOCK and it['saleable'] and not known[k].get('saleable'):
+            notify('TCSB 陀螺補貨了！快搶', msg, click=it['url'], tags=['rotating_light'], priority=5)
+            log('TCSB 補貨：', k, it['name'])
+
+
 def wanted(name):
     low = name.lower()
     return any(k in low for k in INCLUDE) and not any(k in low for k in EXCLUDE)
@@ -277,9 +344,11 @@ def check(dry_run=False):
     if state is not None and not dry_run:
         send_reminders(state)
         check_shop(state)
+        check_tcsb(state)
         save_state(state)
     if dry_run:
         check_shop({}, dry_run=True)
+        check_tcsb({}, dry_run=True)
     try:
         found = collect()
         if not found:
@@ -302,6 +371,7 @@ def check(dry_run=False):
     if state is None:
         state = {'seen': {k: v['name'] for k, v in found.items()}, 'fails': 0, 'upcoming': {}}
         check_shop(state)
+        check_tcsb(state)
         # 找出目前已上架、還沒開賣的目標商品，之後才能提醒
         for it in found.values():
             if it['id'].startswith('TP'):
