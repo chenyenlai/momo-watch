@@ -306,7 +306,7 @@ def add_sheet(data):
     for b in blades:
         if b['code'] and not b.get('part'):
             by_code.setdefault(b['code'], []).append(b)
-    # 圖片：BeybladeHub 的圖有防盜連，改用 stan-yao 放在 imgbb 的圖（優先原版顏色、同型號那張）
+    # 圖片：BeybladeHub 的圖有防盜連，改用 stan-yao 放在 imgbb 的圖（優先同型號那張，再來是原版顏色）
     best, names = {}, {}
     for x in rows:
         name = base_name(x[1])
@@ -315,7 +315,7 @@ def add_sheet(data):
             names[name] = img
         if name in by_zh:
             b = by_zh[name]
-            score = (x[1].strip() != name) * 2 + (x[0] != b['code'])
+            score = (x[0] != b['code']) * 2 + (x[1].strip() != name)   # 同型號優先（BX-34 寫成「蒼穹龍騎士(左)」）
             if img and (b['id'] not in best or score < best[b['id']][0]):
                 best[b['id']] = (score, img)
             continue
