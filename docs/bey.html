@@ -125,8 +125,11 @@ footer a { color: var(--muted); }
 </main>
 <script>
 // 雲端同步：Google 試算表的 Apps Script（apps-script/bey-sync.gs）；空白就只存在這台裝置
-const SYNC_URL = '';
-const SYNC_KEY = 'RtGRJnX8lM1vqnXf';
+// 密碼不放在公開程式碼：每台裝置第一次輸入，記在這台的 localStorage
+const SYNC_URL = 'https://script.google.com/macros/s/AKfycbzjYQVeP9RylKC8HxeYQiOha3V9d8KhHqyUHr7HTjzJCeH_mDvpM8YBj6Xdz0b57z8y/exec';
+const PW_KEY = 'bey-sync-key';
+let SYNC_KEY = '';
+try { SYNC_KEY = localStorage.getItem(PW_KEY) || ''; } catch (e) {}
 const KEY = 'bey-records-v1';
 
 const $ = (s) => document.querySelector(s);
@@ -178,14 +181,25 @@ function delRec(id) {
 }
 
 let syncing = null;
-function syncMsg(t) { $('#sync').textContent = t; }
+function syncMsg(t, ask) {
+  $('#sync').textContent = t;
+  if (ask) $('#sync').insertAdjacentHTML('beforeend', ' <button class="btn ghost" id="pwBtn" type="button">輸入同步密碼</button>');
+}
+function askKey() {
+  const k = (prompt('雲端同步密碼（只要輸入一次，會記在這台裝置）') || '').trim();
+  if (!k) return;
+  SYNC_KEY = k;
+  try { localStorage.setItem(PW_KEY, k); } catch (e) {}
+  syncMsg('同步中…'); sync();
+}
 function sync() {
   if (!SYNC_URL) { syncMsg('紀錄存在這台裝置（還沒設定雲端同步）'); return; }
+  if (!SYNC_KEY) { syncMsg('紀錄先存在這台裝置。', true); return; }
   if (syncing) return syncing;
   const add = S.addQ.slice(), del = S.delQ.slice();
   const req = add.length || del.length
     ? fetch(SYNC_URL, { method: 'POST', body: JSON.stringify({ k: SYNC_KEY, add, del }) })
-    : fetch(SYNC_URL + '?k=' + SYNC_KEY);
+    : fetch(SYNC_URL + '?k=' + encodeURIComponent(SYNC_KEY));
   syncing = req.then(r => r.json()).then(d => {
     if (!d.ok) throw new Error(d.err);
     const sent = new Set(add.map(r => r.id));
@@ -195,8 +209,12 @@ function sync() {
     S.recs = d.recs.filter(r => !gone.has(r.id)).concat(S.addQ);   // 雲端為準，加上還沒送出的
     save(); render();
     syncMsg('☁️ 已同步 ' + new Date().toTimeString().slice(0, 5));
-  }).catch(() => {
+  }).catch((e) => {
     const n = S.addQ.length + S.delQ.length;
+    if (e && e.message === 'key') {   // 密碼錯：清掉，請重新輸入
+      SYNC_KEY = ''; try { localStorage.removeItem(PW_KEY); } catch (x) {}
+      syncMsg('⚠️ 同步密碼不對' + (n ? '，' + n + ' 筆先存在這台' : '') + '。', true); return;
+    }
     syncMsg('⚠️ 暫時連不到雲端' + (n ? '，' + n + ' 筆先存在這台，之後會補傳' : ''));
   }).finally(() => { syncing = null; });
   return syncing;
@@ -491,6 +509,7 @@ function renderMine() {
 let timer = null;
 $('#q').addEventListener('input', () => { clearTimeout(timer); openForm = null; timer = setTimeout(render, 120); });
 document.addEventListener('click', (e) => {
+  if (e.target.closest('#pwBtn')) { askKey(); return; }
   const q = e.target.closest('[data-q]');
   if (q) { $('#q').value = q.dataset.q; openForm = null; render(); return; }
   const buy = e.target.closest('[data-buy]');
