@@ -91,6 +91,16 @@ form.rec .actions { grid-column: 1 / -1; margin-top: 0; }
 .mine .when { font-size: 13px; color: var(--muted); }
 .mine button { grid-row: 1 / 3; grid-column: 2; align-self: center; border: 0; background: none; color: var(--muted);
   font: inherit; font-size: 13px; cursor: pointer; padding: 6px; }
+.all .chips { margin: 0 0 8px; }
+.all .chip.sel { background: var(--accent); color: var(--card); font-weight: 700; }
+.all ul { list-style: none; margin: 4px 0 0; padding: 0; }
+.all li button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center;
+  padding: 9px 2px; border-top: 1px solid var(--line); cursor: pointer; }
+.all li:first-child button { border-top: 0; }
+.all .lvb { font-weight: 800; font-size: 14px; text-align: center; }
+.all .nm { font-weight: 600; }
+.all .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.all .own { color: var(--ok); font-weight: 700; font-size: 13px; }
 .vars { margin: 10px 0 0; padding: 0; list-style: none; font-size: 14px; }
 .vars li { padding: 6px 0; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: baseline; }
 .vars li:first-child { border-top: 0; }
@@ -369,10 +379,37 @@ function partCard(kind, key) {
   return x + `</dl></article>`;
 }
 
+// ---------- 全部陀螺表 ----------
+let L = { type: '', sort: 'tier', mine: false };
+try { L = Object.assign(L, JSON.parse(localStorage.getItem('bey-list')) || {}); } catch (e) {}
+let pick = null;   // 從表點進去的那顆（名字太短會跟零件撞名，所以直接用 id）
+const CX_PARTS = ['主刃', '金屬戰刃', '超越戰刃', '輔助戰刃'];
+function allList() {
+  let bs = D.blades.filter(b => L.type === 'CX' ? CX_PARTS.includes(b.part) : !b.part && (!L.type || b.type === L.type));
+  if (L.mine) bs = bs.filter(b => owned(b.id).length);
+  const lv = (b) => b.tier ? b.tier.level : 99, use = (b) => b.stats && b.stats.usage != null ? b.stats.usage : -1;
+  const cmp = { tier: (a, b) => lv(a) - lv(b) || use(b) - use(a), hot: (a, b) => use(b) - use(a) || lv(a) - lv(b),
+    code: (a, b) => (a.code || 'ZZ').localeCompare(b.code || 'ZZ', 'en', { numeric: true }) }[L.sort];
+  bs.sort(cmp);
+  const ch = (k, v, t) => `<button class="chip${L[k] === v ? ' sel' : ''}" data-l="${k}" data-v="${esc(String(v))}">${t}</button>`;
+  let x = `<section class="card all"><h2>全部陀螺（${bs.length}）</h2><div class="chips">` +
+    [['', '全部'], ['攻擊', '攻擊'], ['防守', '防守'], ['持久', '持久'], ['均衡', '均衡'], ['CX', 'CX 零件']].map(([v, t]) => ch('type', v, t)).join('') +
+    `</div><div class="chips">` + [['tier', '依強度'], ['hot', '依熱門'], ['code', '依型號']].map(([v, t]) => ch('sort', v, t)).join('') +
+    `<button class="chip${L.mine ? ' sel' : ''}" data-l="mine" data-v="${L.mine ? '' : '1'}">✓ 只看我有的</button></div><ul>`;
+  x += bs.map(b => {
+    const n = owned(b.id).length, h = hot(b.stats);
+    const sub = [b.code, b.part || b.type, b.stats && b.stats.usage != null ? h.short : ''].filter(Boolean).join('・');
+    return `<li><button data-pick="${esc(b.id)}"><span class="lvb lv${LV(b.tier)}">${b.tier ? esc(b.tier.label) : '—'}</span>` +
+      `<span class="nm">${esc(b.zh)}<small>${esc(sub)}</small></span><span class="own">${n ? '✓' + (n > 1 ? n : '') : ''}</span></button></li>`;
+  }).join('') || '<li class="empty">沒有符合的陀螺</li>';
+  return x + `</ul></section>`;
+}
+
 let recTargets = {};   // 卡片 key → 要記錄的內容
 function search(q) {
   const raw = q.trim();
   if (!raw) return null;
+  if (pick && byId[pick] && byId[pick].zh === raw) return { parts: [], blades: [byId[pick]] };
   const code = raw.toUpperCase().replace(/\s/g, '').match(/^([BUC]XH?)-?(\d{1,3})$/);
   if (code) {
     const c = code[1] + '-' + code[2].padStart(2, '0');
@@ -407,7 +444,7 @@ function render() {
     const top = D.blades.filter(b => b.tier && b.tier.level <= 1).sort((a, b) => a.tier.level - b.tier.level);
     x += `<p class="meta">輸入型號（UX-03）、中文、英文或日文名稱，或固鎖、軸心（1-60、LR）。目前台灣 T 表最強：</p><div class="chips">`;
     x += top.map(b => `<button class="chip" data-q="${esc(b.code || b.zh)}">${esc(b.tier.label)} ${esc(b.zh)}</button>`).join('');
-    x += `</div>`;
+    x += `</div>` + allList();
   } else if (r.code) {
     if (r.prod || r.blades.length > 1) {
       const P = r.prod || {}, key = 'p:' + r.code;
@@ -510,6 +547,16 @@ let timer = null;
 $('#q').addEventListener('input', () => { clearTimeout(timer); openForm = null; timer = setTimeout(render, 120); });
 document.addEventListener('click', (e) => {
   if (e.target.closest('#pwBtn')) { askKey(); return; }
+  const lf = e.target.closest('[data-l]');
+  if (lf) {
+    L[lf.dataset.l] = lf.dataset.l === 'mine' ? !!lf.dataset.v : lf.dataset.v;
+    try { localStorage.setItem('bey-list', JSON.stringify(L)); } catch (x) {}
+    render(); return;
+  }
+  const pk = e.target.closest('[data-pick]');
+  if (pk && byId[pk.dataset.pick]) {
+    pick = pk.dataset.pick; $('#q').value = byId[pick].zh; openForm = null; render(); window.scrollTo(0, 0); return;
+  }
   const q = e.target.closest('[data-q]');
   if (q) { $('#q').value = q.dataset.q; openForm = null; render(); return; }
   const buy = e.target.closest('[data-buy]');
