@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""戰鬥陀螺新品監測：MOMO 上的 FUNBOX（funbox toys 品牌館）、FUNBOX 官網和天成書店 TCSB，有新品或補貨就推播到手機（ntfy）。
+"""戰鬥陀螺新品監測：MOMO 上的 FUNBOX（funbox toys 品牌館）、FUNBOX 官網和墊腳石 TCSB，有新品或補貨就推播到手機（ntfy）。
 
 只用 Python 內建模組，NAS / Docker / 一般電腦都能跑。
 
@@ -13,11 +13,13 @@
 FUNBOX 的預購商品會記下開賣時間，開賣前 REMIND_BEFORE 分鐘再提醒一次。
 """
 
+import http.cookiejar
 import json
 import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -46,7 +48,8 @@ SHOP_FEEDS = [
 SHOP_SKIP = ['APP兌換']
 SHOP_RESTOCK = False  # True = 庫存從 0 變有貨也通知
 
-# 天成書店 TCSB（tcsb.com.tw，Bagisto）：搜尋「戰鬥陀螺」，新品上架、售完變可購買都通知
+# 墊腳石 TCSB（tcsb.com.tw，Bagisto）：搜尋「戰鬥陀螺」，新品上架、售完變可購買都通知
+# 網站搜尋結果和商品頁的「有貨」不準（加進購物車才顯示庫存不足），所以用匿名購物車確認真正庫存
 TCSB_QUERY = '戰鬥陀螺'
 TCSB_PAGES = 1       # 每頁 36 件（網站只接受 limit=36）；陀螺都排在第 1 頁
 TCSB_EVERY = 120     # 至少隔幾秒才查一次（太密會被回 429）
@@ -256,11 +259,44 @@ def fetch_tcsb():
         time.sleep(1)
     if not found:
         raise RuntimeError('一件陀螺都沒抓到，可能網站改版')
+    tcsb_real_stock(found)
     return found
 
 
+def tcsb_real_stock(found):
+    """網站標「有貨」的，放進一個新的匿名購物車，看是否顯示庫存不足；有問題就丟錯（這輪不算，免得誤報補貨）"""
+    ids = [k for k, it in found.items() if it['saleable']]
+    if not ids:
+        return
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    base = 'https://www.tcsb.com.tw/api/checkout/cart'
+    hdr = {'User-Agent': UA, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
+    opener.open(urllib.request.Request(base + '/mini', headers=hdr), timeout=30).read()  # 拿 session 和 XSRF cookie
+    xsrf = next((urllib.parse.unquote(c.value) for c in jar if c.name == 'XSRF-TOKEN'), '')
+    if not xsrf:
+        raise RuntimeError('拿不到 XSRF-TOKEN，可能網站改版')
+    post_hdr = dict(hdr, **{'Content-Type': 'application/json', 'X-XSRF-TOKEN': xsrf})
+    for k in ids:
+        time.sleep(1)
+        body = json.dumps({'product_id': int(k), 'quantity': 1, 'is_buy_now': 0}).encode('utf-8')
+        try:
+            opener.open(urllib.request.Request(base, data=body, headers=post_hdr), timeout=30).read()
+        except urllib.error.HTTPError as e:
+            if e.code != 400:  # 400 = 加不進購物車（超過可購買數量 = 沒貨）
+                raise
+            found[k]['saleable'] = False
+    time.sleep(1)
+    cart = json.loads(opener.open(urllib.request.Request(base, headers=hdr), timeout=30).read().decode('utf-8'))
+    items = {str(i.get('product_id')): i for i in ((cart.get('data') or {}).get('items') or [])}
+    for k in ids:
+        if found[k]['saleable']:
+            i = items.get(k)
+            found[k]['saleable'] = bool(i) and not i.get('stock_insufficient')
+
+
 def check_tcsb(state, dry_run=False):
-    """天成書店 TCSB：新陀螺上架時通知（TCSB_RESTOCK 開啟時，售完變可購買也通知）"""
+    """墊腳石 TCSB：新陀螺上架時通知（TCSB_RESTOCK 開啟時，售完變可購買也通知）"""
     if not dry_run:
         if time.time() - state.get('tcsb_at', 0) < TCSB_EVERY - 5:
             return
