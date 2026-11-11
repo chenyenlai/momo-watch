@@ -94,10 +94,16 @@ form.rec .actions { grid-column: 1 / -1; margin-top: 0; }
 .all .chips { margin: 0 0 8px; }
 .all .chip.sel { background: var(--accent); color: var(--card); font-weight: 700; }
 .all ul { list-style: none; margin: 4px 0 0; padding: 0; }
-.all li button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center;
-  padding: 9px 2px; border-top: 1px solid var(--line); cursor: pointer; }
+.all li button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center;
+  padding: 7px 2px; border-top: 1px solid var(--line); cursor: pointer; }
 .all li:first-child button { border-top: 0; }
-.all .lvb { font-weight: 800; font-size: 14px; text-align: center; }
+.all .lvb { font-weight: 800; font-size: 14px; }
+.all .rt { display: grid; justify-items: end; gap: 2px; min-width: 36px; }
+.pic { position: relative; width: 52px; height: 52px; border-radius: 10px; background: var(--chip); display: block; }
+.pic:empty::after { content: '🌀'; display: grid; place-items: center; height: 100%; font-size: 22px; opacity: .35; }
+.pic img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.pic img.crest { position: absolute; right: -4px; bottom: -4px; width: 24px; height: 24px; border-radius: 50%; background: var(--card); padding: 1px; }
+.bey .pic.big { width: 76px; height: 76px; flex-shrink: 0; }
 .all .nm { font-weight: 600; }
 .all .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
 .all .own { color: var(--ok); font-weight: 700; font-size: 13px; }
@@ -304,7 +310,7 @@ let openForm = null;   // 正在填「我買了」的卡片 key
 function beyCard(b, rec) {
   const t = b.tier, st = b.stats, h = hot(st), v = verdict(b), lv = LV(t);
   const key = rec.key;
-  let x = `<article class="card bey"><div class="top"><div>`;
+  let x = `<article class="card bey"><div class="top">${b.img ? `<span class="pic big"><img src="${esc(b.img)}" alt="" loading="lazy"></span>` : ''}<div style="flex:1">`;
   x += `<div class="name">${esc(b.zh)}</div>`;
   x += `<div class="sub">${esc([b.code, b.en, b.ja].filter(Boolean).join('・'))}</div>`;
   const cxn = [...new Set(CX.filter(e => e.main === b.id).map(e => e.name + '（' + e.code + '）'))];
@@ -385,9 +391,22 @@ try { L = Object.assign(L, JSON.parse(localStorage.getItem('bey-list')) || {}); 
 let pick = null;   // 從表點進去的那顆（名字太短會跟零件撞名，所以直接用 id）
 const CX_PARTS = ['主刃', '金屬戰刃', '超越戰刃', '輔助戰刃'];
 function allList() {
-  let bs = D.blades.filter(b => L.type === 'CX' ? CX_PARTS.includes(b.part) : !b.part && (!L.type || b.type === L.type));
-  if (L.mine) bs = bs.filter(b => owned(b.id).length);
-  const lv = (b) => b.tier ? b.tier.level : 99, use = (b) => b.stats && b.stats.usage != null ? b.stats.usage : -1;
+  // 一般上蓋＋CX 組合（蒼龍勇氣：強度看主刃）；「CX 零件」才列拆開的零件
+  let bs = D.blades.filter(b => L.type === 'CX' ? CX_PARTS.includes(b.part) : !b.part && (!L.type || b.type === L.type))
+    .map(b => ({ b, name: b.zh, code: b.code, img: b.img, n: owned(b.id).length, sub: b.part || b.type }));
+  if (L.type !== 'CX') {
+    const seen = new Set();
+    for (const e of CX) {
+      const m = byId[e.main];
+      if (!m || seen.has(e.name) || (L.type && m.type !== L.type)) continue;
+      seen.add(e.name);
+      const ch = byId[e.chip];
+      bs.push({ b: m, name: e.name, code: e.code, img: (D.cxImg || {})[e.name] || m.img, chipImg: ch && ch.img, cx: e, sub: m.type + '・CX',
+        n: S.recs.filter(r => r.code === e.code && (r.blades || []).includes(m.id)).length });
+    }
+  }
+  if (L.mine) bs = bs.filter(o => o.n);
+  const lv = (o) => o.b.tier ? o.b.tier.level : 99, use = (o) => o.b.stats && o.b.stats.usage != null ? o.b.stats.usage : -1;
   const cmp = { tier: (a, b) => lv(a) - lv(b) || use(b) - use(a), hot: (a, b) => use(b) - use(a) || lv(a) - lv(b),
     code: (a, b) => (a.code || 'ZZ').localeCompare(b.code || 'ZZ', 'en', { numeric: true }) }[L.sort];
   bs.sort(cmp);
@@ -396,11 +415,14 @@ function allList() {
     [['', '全部'], ['攻擊', '攻擊'], ['防守', '防守'], ['持久', '持久'], ['均衡', '均衡'], ['CX', 'CX 零件']].map(([v, t]) => ch('type', v, t)).join('') +
     `</div><div class="chips">` + [['tier', '依強度'], ['hot', '依熱門'], ['code', '依型號']].map(([v, t]) => ch('sort', v, t)).join('') +
     `<button class="chip${L.mine ? ' sel' : ''}" data-l="mine" data-v="${L.mine ? '' : '1'}">✓ 只看我有的</button></div><ul>`;
-  x += bs.map(b => {
-    const n = owned(b.id).length, h = hot(b.stats);
-    const sub = [b.code, b.part || b.type, b.stats && b.stats.usage != null ? h.short : ''].filter(Boolean).join('・');
-    return `<li><button data-pick="${esc(b.id)}"><span class="lvb lv${LV(b.tier)}">${b.tier ? esc(b.tier.label) : '—'}</span>` +
-      `<span class="nm">${esc(b.zh)}<small>${esc(sub)}</small></span><span class="own">${n ? '✓' + (n > 1 ? n : '') : ''}</span></button></li>`;
+  x += bs.map(o => {
+    const b = o.b, h = hot(b.stats);
+    const sub = [o.code, o.sub, b.stats && b.stats.usage != null ? h.short : ''].filter(Boolean).join('・');
+    const act = o.cx ? `data-q="${esc(o.cx.name)}"` : `data-pick="${esc(b.id)}"`;
+    return `<li><button ${act}><span class="pic">${o.img ? `<img src="${esc(o.img)}" alt="" loading="lazy" decoding="async">` : ''}` +
+      `${o.chipImg ? `<img class="crest" src="${esc(o.chipImg)}" alt="" loading="lazy">` : ''}</span>` +
+      `<span class="nm">${esc(o.name)}<small>${esc(sub)}</small></span>` +
+      `<span class="rt"><span class="lvb lv${LV(b.tier)}">${b.tier ? esc(b.tier.label) : '—'}</span><span class="own">${o.n ? '✓' + (o.n > 1 ? o.n : '') : ''}</span></span></button></li>`;
   }).join('') || '<li class="empty">沒有符合的陀螺</li>';
   return x + `</ul></section>`;
 }
@@ -619,20 +641,24 @@ fetch('bey/data.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
   D = d; byId = Object.fromEntries(d.blades.map(b => [b.id, b]));
   // CX 組合名清單：同型號的紋章＋主刃、商品裡的紋章＋主刃，加上抽抽包每款的名字
   for (const m of d.blades) if ((m.part === '主刃' || m.part === '金屬戰刃') && m.code)
-    for (const c of d.blades) if (isChip(c) && c.code === m.code) CX.push({ name: c.zh + m.zh, code: m.code, main: m.id });
+    for (const c of d.blades) if (isChip(c) && c.code === m.code) CX.push({ name: c.zh + m.zh, code: m.code, main: m.id, chip: c.id });
   for (const [c, p] of Object.entries(d.products)) {
     const bl = (p.blades || []).map(i => byId[i]).filter(Boolean);
     const chip = bl.find(isChip), main = bl.find(b => b.part === '主刃' || b.part === '金屬戰刃');
-    if (chip && main && !p.random) CX.push({ name: chip.zh + main.zh, code: c, main: main.id });
+    if (chip && main && !p.random) CX.push({ name: chip.zh + main.zh, code: c, main: main.id, chip: chip.id });
     for (const v of p.variants || []) {
       const vb = byId[v.blade];
-      if (vb && (vb.part === '主刃' || vb.part === '金屬戰刃')) CX.push({ name: v.name.split(' ')[0].replace(/（.*?）/g, ''), code: c, main: vb.id });
+      if (vb && (vb.part === '主刃' || vb.part === '金屬戰刃')) {
+        const nm = v.name.split(' ')[0].replace(/（.*?）/g, '');
+        const ch = d.blades.filter(isChip).sort((a, b) => b.zh.length - a.zh.length).find(x => nm.startsWith(x.zh));
+        CX.push({ name: nm, code: c, main: vb.id, chip: ch ? ch.id : null });
+      }
     }
   }
   const t = d.tier;
   $('#foot').innerHTML = `強度：<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a>（${esc(t.author)}，${esc(t.updated)}）<br>` +
     `熱門度、冠軍率：<a href="${esc(d.usage.url)}" target="_blank" rel="noopener">BEYWATCH.GG</a> 國外比賽統計（到 ${esc(d.usage.through)}）<br>` +
-    (d.sheet ? `原裝配置、別名、比賽常勝組合：<a href="${esc(d.sheet.url)}" target="_blank" rel="noopener">stan-yao Beyblade X 天梯</a><br>` : '') +
+    (d.sheet ? `圖片、原裝配置、別名、比賽常勝組合：<a href="${esc(d.sheet.url)}" target="_blank" rel="noopener">stan-yao Beyblade X 天梯</a><br>` : '') +
     `型號、名稱：<a href="https://beybladehub.app/parts/blades" target="_blank" rel="noopener">BeybladeHub 上蓋資料庫</a>・每週自動更新，上次 ${esc(d.updated)}`;
   const us = new URLSearchParams(location.search), u = us.get('q');
   if (u) { $('#q').value = u; pick = us.get('id'); }

@@ -306,9 +306,18 @@ def add_sheet(data):
     for b in blades:
         if b['code'] and not b.get('part'):
             by_code.setdefault(b['code'], []).append(b)
+    # 圖片：BeybladeHub 的圖有防盜連，改用 stan-yao 放在 imgbb 的圖（優先原版顏色、同型號那張）
+    best, names = {}, {}
     for x in rows:
         name = base_name(x[1])
+        img = x[12].strip() if x[12].startswith('https://') else ''
+        if img and (name not in names or x[1].strip() == name):
+            names[name] = img
         if name in by_zh:
+            b = by_zh[name]
+            score = (x[1].strip() != name) * 2 + (x[0] != b['code'])
+            if img and (b['id'] not in best or score < best[b['id']][0]):
+                best[b['id']] = (score, img)
             continue
         hit = by_code.get(x[0], [])
         if len(hit) != 1:
@@ -324,10 +333,19 @@ def add_sheet(data):
             al = hit[0].setdefault('alias', [])
             if name not in al:
                 al.append(name)
+            if img and not hit[0].get('part') and (hit[0]['id'] not in best or best[hit[0]['id']][0] > 3):
+                best[hit[0]['id']] = (4, img)
+    for b in blades:
+        b.pop('img', None)
+        alt = names.get(b['zh'].replace(' 2.0', ' 版本2.0')) if not b.get('part') else None   # 蒼龍神劍 2.0 ↔ 版本2.0
+        if b['id'] in best or alt:
+            b['img'] = best[b['id']][1] if b['id'] in best else alt
+    # CX 組合名（蒼龍勇氣）的整顆圖，網頁的列表用
+    data['cxImg'] = {n: u for n, u in names.items() if n not in by_zh}
     data['sheet'] = {'url': SHEET_PAGE, 'n': len(rows)}
     add_combos(data, bits)
-    print('stan-yao 試算表 %d 列：原裝配置 %d 個型號，別名 %d 顆' % (
-        len(rows), len(orig), sum(1 for b in blades if b.get('alias'))))
+    print('stan-yao 試算表 %d 列：原裝配置 %d 個型號，別名 %d 顆，圖片 %d 顆' % (
+        len(rows), len(orig), sum(1 for b in blades if b.get('alias')), len(best)))
 
 
 def add_combos(data, bits):
