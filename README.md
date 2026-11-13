@@ -5,7 +5,6 @@
 - 🏠 [首頁](https://chenyenlai.github.io/momo-watch/)
 - 🚗 [國1 通勤路況](https://chenyenlai.github.io/momo-watch/traffic.html)
 - 🌀 [戰鬥陀螺開賣表](https://chenyenlai.github.io/momo-watch/funbox.html)
-- 📶 [Wi-Fi 技術入門](https://chenyenlai.github.io/momo-watch/wifi.html)
 
 ## 說明
 
