@@ -91,6 +91,22 @@ form.rec .actions { grid-column: 1 / -1; margin-top: 0; }
 .mine .when { font-size: 13px; color: var(--muted); }
 .mine button { grid-row: 1 / 3; grid-column: 2; align-self: center; border: 0; background: none; color: var(--muted);
   font: inherit; font-size: 13px; cursor: pointer; padding: 6px; }
+.all .chips { margin: 0 0 8px; }
+.all .chip.sel { background: var(--accent); color: var(--card); font-weight: 700; }
+.all ul { list-style: none; margin: 4px 0 0; padding: 0; }
+.all li button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center;
+  padding: 7px 2px; border-top: 1px solid var(--line); cursor: pointer; }
+.all li:first-child button { border-top: 0; }
+.all .lvb { font-weight: 800; font-size: 14px; }
+.all .rt { display: grid; justify-items: end; gap: 2px; min-width: 36px; }
+.pic { position: relative; width: 52px; height: 52px; border-radius: 10px; background: var(--chip); display: block; }
+.pic:empty::after { content: '🌀'; display: grid; place-items: center; height: 100%; font-size: 22px; opacity: .35; }
+.pic img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.pic img.crest { position: absolute; right: -4px; bottom: -4px; width: 24px; height: 24px; border-radius: 50%; background: var(--card); padding: 1px; }
+.bey .pic.big { width: 76px; height: 76px; flex-shrink: 0; }
+.all .nm { font-weight: 600; }
+.all .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.all .own { color: var(--ok); font-weight: 700; font-size: 13px; }
 .vars { margin: 10px 0 0; padding: 0; list-style: none; font-size: 14px; }
 .vars li { padding: 6px 0; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: baseline; }
 .vars li:first-child { border-top: 0; }
@@ -125,8 +141,11 @@ footer a { color: var(--muted); }
 </main>
 <script>
 // 雲端同步：Google 試算表的 Apps Script（apps-script/bey-sync.gs）；空白就只存在這台裝置
-const SYNC_URL = '';
-const SYNC_KEY = 'RtGRJnX8lM1vqnXf';
+// 密碼不放在公開程式碼：每台裝置第一次輸入，記在這台的 localStorage
+const SYNC_URL = 'https://script.google.com/macros/s/AKfycbzjYQVeP9RylKC8HxeYQiOha3V9d8KhHqyUHr7HTjzJCeH_mDvpM8YBj6Xdz0b57z8y/exec';
+const PW_KEY = 'bey-sync-key';
+let SYNC_KEY = '';
+try { SYNC_KEY = localStorage.getItem(PW_KEY) || ''; } catch (e) {}
 const KEY = 'bey-records-v1';
 
 const $ = (s) => document.querySelector(s);
@@ -134,6 +153,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const norm = (s) => String(s || '').toLowerCase().replace(/[\s\-_.・·]/g, '');
 let D = null;            // data.json
 let byId = {};
+const CX = [];           // {name: '蒼龍勇氣', code: 'CX-01', main: 'cx-main-Br'}
 
 // ---------- 紀錄（先存這台，再同步到雲端） ----------
 let S = { recs: [], addQ: [], delQ: [] };
@@ -177,14 +197,25 @@ function delRec(id) {
 }
 
 let syncing = null;
-function syncMsg(t) { $('#sync').textContent = t; }
+function syncMsg(t, ask) {
+  $('#sync').textContent = t;
+  if (ask) $('#sync').insertAdjacentHTML('beforeend', ' <button class="btn ghost" id="pwBtn" type="button">輸入同步密碼</button>');
+}
+function askKey() {
+  const k = (prompt('雲端同步密碼（只要輸入一次，會記在這台裝置）') || '').trim();
+  if (!k) return;
+  SYNC_KEY = k;
+  try { localStorage.setItem(PW_KEY, k); } catch (e) {}
+  syncMsg('同步中…'); sync();
+}
 function sync() {
   if (!SYNC_URL) { syncMsg('紀錄存在這台裝置（還沒設定雲端同步）'); return; }
+  if (!SYNC_KEY) { syncMsg('紀錄先存在這台裝置。', true); return; }
   if (syncing) return syncing;
   const add = S.addQ.slice(), del = S.delQ.slice();
   const req = add.length || del.length
     ? fetch(SYNC_URL, { method: 'POST', body: JSON.stringify({ k: SYNC_KEY, add, del }) })
-    : fetch(SYNC_URL + '?k=' + SYNC_KEY);
+    : fetch(SYNC_URL + '?k=' + encodeURIComponent(SYNC_KEY));
   syncing = req.then(r => r.json()).then(d => {
     if (!d.ok) throw new Error(d.err);
     const sent = new Set(add.map(r => r.id));
@@ -194,8 +225,12 @@ function sync() {
     S.recs = d.recs.filter(r => !gone.has(r.id)).concat(S.addQ);   // 雲端為準，加上還沒送出的
     save(); render();
     syncMsg('☁️ 已同步 ' + new Date().toTimeString().slice(0, 5));
-  }).catch(() => {
+  }).catch((e) => {
     const n = S.addQ.length + S.delQ.length;
+    if (e && e.message === 'key') {   // 密碼錯：清掉，請重新輸入
+      SYNC_KEY = ''; try { localStorage.removeItem(PW_KEY); } catch (x) {}
+      syncMsg('⚠️ 同步密碼不對' + (n ? '，' + n + ' 筆先存在這台' : '') + '。', true); return;
+    }
     syncMsg('⚠️ 暫時連不到雲端' + (n ? '，' + n + ' 筆先存在這台，之後會補傳' : ''));
   }).finally(() => { syncing = null; });
   return syncing;
@@ -275,10 +310,13 @@ let openForm = null;   // 正在填「我買了」的卡片 key
 function beyCard(b, rec) {
   const t = b.tier, st = b.stats, h = hot(st), v = verdict(b), lv = LV(t);
   const key = rec.key;
-  let x = `<article class="card bey"><div class="top"><div>`;
+  let x = `<article class="card bey"><div class="top">${b.img ? `<span class="pic big"><img src="${esc(b.img)}" alt="" loading="lazy"></span>` : ''}<div style="flex:1">`;
   x += `<div class="name">${esc(b.zh)}</div>`;
   x += `<div class="sub">${esc([b.code, b.en, b.ja].filter(Boolean).join('・'))}</div>`;
-  if (b.alias) x += `<div class="sub">也叫：${esc(b.alias.join('、'))}</div>`;
+  const cxn = [...new Set(CX.filter(e => e.main === b.id).map(e => e.name + '（' + e.code + '）'))];
+  if (cxn.length) x += `<div class="sub">組合名：${esc(cxn.join('、'))}</div>`;
+  const al = (b.alias || []).filter(a => !CX.some(e => e.name === a));
+  if (al.length) x += `<div class="sub">也叫：${esc(al.join('、'))}</div>`;
   x += `<div class="sub">${esc([b.type, b.spin, b.weight ? b.weight + ' g' : ''].filter(Boolean).join('・'))}</div></div>`;
   x += `<div class="tier lv${lv}">${t ? esc(t.label) : '—'}<small>強度</small></div></div>`;
   if (isChip(b)) {
@@ -347,10 +385,53 @@ function partCard(kind, key) {
   return x + `</dl></article>`;
 }
 
+// ---------- 全部陀螺表 ----------
+let L = { type: '', sort: 'tier', mine: false };
+try { L = Object.assign(L, JSON.parse(localStorage.getItem('bey-list')) || {}); } catch (e) {}
+let pick = null;   // 從表點進去的那顆（名字太短會跟零件撞名，所以直接用 id）
+const CX_PARTS = ['主刃', '金屬戰刃', '超越戰刃', '輔助戰刃'];
+function allList() {
+  // 一般上蓋＋CX 組合（蒼龍勇氣：強度看主刃）；「CX 零件」才列拆開的零件
+  let bs = D.blades.filter(b => L.type === 'CX' ? CX_PARTS.includes(b.part) : !b.part && (!L.type || b.type === L.type))
+    .map(b => ({ b, name: b.zh, code: b.code, img: b.img, n: owned(b.id).length, sub: b.part || b.type }));
+  if (L.type !== 'CX') {
+    const seen = new Set();
+    for (const e of CX) {
+      const m = byId[e.main];
+      if (!m || seen.has(e.name) || (L.type && m.type !== L.type)) continue;
+      seen.add(e.name);
+      const ch = byId[e.chip];
+      bs.push({ b: m, name: e.name, code: e.code, img: (D.cxImg || {})[e.name] || m.img, chipImg: ch && ch.img, cx: e, sub: m.type + '・CX',
+        n: S.recs.filter(r => r.code === e.code && (r.blades || []).includes(m.id)).length });
+    }
+  }
+  if (L.mine) bs = bs.filter(o => o.n);
+  const lv = (o) => o.b.tier ? o.b.tier.level : 99, use = (o) => o.b.stats && o.b.stats.usage != null ? o.b.stats.usage : -1;
+  const cmp = { tier: (a, b) => lv(a) - lv(b) || use(b) - use(a), hot: (a, b) => use(b) - use(a) || lv(a) - lv(b),
+    code: (a, b) => (a.code || 'ZZ').localeCompare(b.code || 'ZZ', 'en', { numeric: true }) }[L.sort];
+  bs.sort(cmp);
+  const ch = (k, v, t) => `<button class="chip${L[k] === v ? ' sel' : ''}" data-l="${k}" data-v="${esc(String(v))}">${t}</button>`;
+  let x = `<section class="card all"><h2>全部陀螺（${bs.length}）</h2><div class="chips">` +
+    [['', '全部'], ['攻擊', '攻擊'], ['防守', '防守'], ['持久', '持久'], ['均衡', '均衡'], ['CX', 'CX 零件']].map(([v, t]) => ch('type', v, t)).join('') +
+    `</div><div class="chips">` + [['tier', '依強度'], ['hot', '依熱門'], ['code', '依型號']].map(([v, t]) => ch('sort', v, t)).join('') +
+    `<button class="chip${L.mine ? ' sel' : ''}" data-l="mine" data-v="${L.mine ? '' : '1'}">✓ 只看我有的</button></div><ul>`;
+  x += bs.map(o => {
+    const b = o.b, h = hot(b.stats);
+    const sub = [o.code, o.sub, b.stats && b.stats.usage != null ? h.short : ''].filter(Boolean).join('・');
+    const act = o.cx ? `data-q="${esc(o.cx.name)}"` : `data-pick="${esc(b.id)}"`;
+    return `<li><button ${act}><span class="pic">${o.img ? `<img src="${esc(o.img)}" alt="" loading="lazy" decoding="async">` : ''}` +
+      `${o.chipImg ? `<img class="crest" src="${esc(o.chipImg)}" alt="" loading="lazy">` : ''}</span>` +
+      `<span class="nm">${esc(o.name)}<small>${esc(sub)}</small></span>` +
+      `<span class="rt"><span class="lvb lv${LV(b.tier)}">${b.tier ? esc(b.tier.label) : '—'}</span><span class="own">${o.n ? '✓' + (o.n > 1 ? o.n : '') : ''}</span></span></button></li>`;
+  }).join('') || '<li class="empty">沒有符合的陀螺</li>';
+  return x + `</ul></section>`;
+}
+
 let recTargets = {};   // 卡片 key → 要記錄的內容
 function search(q) {
   const raw = q.trim();
   if (!raw) return null;
+  if (pick && byId[pick] && byId[pick].zh === raw) return { parts: [], blades: [byId[pick]] };
   const code = raw.toUpperCase().replace(/\s/g, '').match(/^([BUC]XH?)-?(\d{1,3})$/);
   if (code) {
     const c = code[1] + '-' + code[2].padStart(2, '0');
@@ -366,9 +447,11 @@ function search(q) {
   if (parts.length && !/[^\x00-\x7f]/.test(raw) && raw.length <= 3) return { parts, blades: [] };   // 「LR」「1-60」只看零件
   let hit = D.blades.filter(b => b.zh.includes(raw) || norm(b.en).includes(n) || (b.ja && b.ja.includes(raw)) || norm(b.code) === n ||
     (b.alias || []).some(a => a.includes(raw)));
-  if (!hit.length) {   // CX 的名字＝紋章＋主刃（惡魔獵魂 → 獵魂）
-    const mains = D.blades.filter(b => b.part === '主刃' || b.part === '金屬戰刃');
-    hit = mains.filter(m => D.blades.some(c => isChip(c) && raw.startsWith(c.zh) && raw.slice(c.zh.length).startsWith(m.zh)));
+  if (!hit.some(b => b.zh === raw)) {   // CX 的名字＝紋章＋主刃（蒼龍勇氣、惡魔獵魂），打一半也算
+    const cx = CX.filter(e => raw.length >= 2 && (e.name.includes(raw) || raw.startsWith(e.name)));
+    const codes = [...new Set(cx.map(e => e.code))];
+    if (codes.length === 1 && !hit.length) return search(codes[0]);   // 只有一個商品：直接顯示那個商品
+    for (const e of cx) if (!hit.includes(byId[e.main])) hit.push(byId[e.main]);
   }
   hit.sort((a, b) => (a.tier ? a.tier.level : 99) - (b.tier ? b.tier.level : 99));
   return { parts, blades: hit.slice(0, 15) };
@@ -383,7 +466,7 @@ function render() {
     const top = D.blades.filter(b => b.tier && b.tier.level <= 1).sort((a, b) => a.tier.level - b.tier.level);
     x += `<p class="meta">輸入型號（UX-03）、中文、英文或日文名稱，或固鎖、軸心（1-60、LR）。目前台灣 T 表最強：</p><div class="chips">`;
     x += top.map(b => `<button class="chip" data-q="${esc(b.code || b.zh)}">${esc(b.tier.label)} ${esc(b.zh)}</button>`).join('');
-    x += `</div>`;
+    x += `</div>` + allList();
   } else if (r.code) {
     if (r.prod || r.blades.length > 1) {
       const P = r.prod || {}, key = 'p:' + r.code;
@@ -483,10 +566,50 @@ function renderMine() {
 
 // ---------- 事件 ----------
 let timer = null;
-$('#q').addEventListener('input', () => { clearTimeout(timer); openForm = null; timer = setTimeout(render, 120); });
+// 上一頁：每次「點進去」都記一筆瀏覽紀錄，按上一頁回到表（和原本捲到的位置），不會跳出這頁
+function urlOf(q, pk) {
+  const u = new URLSearchParams();
+  if (q) u.set('q', q);
+  if (pk) u.set('id', pk);
+  return location.pathname + (u.toString() ? '?' + u : '');
+}
+function go(q, pk) {
+  history.replaceState(Object.assign({}, history.state, { y: window.scrollY }), '', location.href);
+  pick = pk || null; $('#q').value = q; openForm = null;
+  history.pushState({ q, pick: pick, y: 0, deep: true }, '', urlOf(q, pick));
+  render(); window.scrollTo(0, 0);
+}
+window.addEventListener('popstate', (e) => {
+  const st = e.state || {}, u = new URLSearchParams(location.search);
+  $('#q').value = st.q != null ? st.q : (u.get('q') || '');
+  pick = st.pick || u.get('id') || null; openForm = null;
+  render(); window.scrollTo(0, st.y || 0);
+});
+$('#q').addEventListener('input', () => {
+  clearTimeout(timer); openForm = null;
+  const q = $('#q').value.trim(), st = history.state || {};
+  if (!q && st.deep) { history.back(); return; }   // 清空搜尋框＝回上一頁
+  if (q && !st.deep) {   // 從首頁開始打字：記一筆，上一頁可以回首頁
+    history.replaceState(Object.assign({}, st, { y: window.scrollY }), '', location.href);
+    history.pushState({ q, deep: true }, '', urlOf(q));
+  } else history.replaceState(Object.assign({}, st, { q, pick: null }), '', urlOf(q));
+  pick = null;
+  timer = setTimeout(render, 120);
+});
 document.addEventListener('click', (e) => {
+  if (e.target.closest('#pwBtn')) { askKey(); return; }
+  const lf = e.target.closest('[data-l]');
+  if (lf) {
+    L[lf.dataset.l] = lf.dataset.l === 'mine' ? !!lf.dataset.v : lf.dataset.v;
+    try { localStorage.setItem('bey-list', JSON.stringify(L)); } catch (x) {}
+    render(); return;
+  }
+  const pk = e.target.closest('[data-pick]');
+  if (pk && byId[pk.dataset.pick]) {
+    go(byId[pk.dataset.pick].zh, pk.dataset.pick); return;
+  }
   const q = e.target.closest('[data-q]');
-  if (q) { $('#q').value = q.dataset.q; openForm = null; render(); return; }
+  if (q) { go(q.dataset.q); return; }
   const buy = e.target.closest('[data-buy]');
   if (buy) { openForm = openForm === buy.dataset.buy ? null : buy.dataset.buy; render(); const f = document.querySelector('form.rec input[name=p]'); if (f) f.focus(); return; }
   if (e.target.closest('[data-cancel]')) { openForm = null; render(); return; }
@@ -516,13 +639,30 @@ document.addEventListener('submit', (e) => {
 
 fetch('bey/data.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
   D = d; byId = Object.fromEntries(d.blades.map(b => [b.id, b]));
+  // CX 組合名清單：同型號的紋章＋主刃、商品裡的紋章＋主刃，加上抽抽包每款的名字
+  for (const m of d.blades) if ((m.part === '主刃' || m.part === '金屬戰刃') && m.code)
+    for (const c of d.blades) if (isChip(c) && c.code === m.code) CX.push({ name: c.zh + m.zh, code: m.code, main: m.id, chip: c.id });
+  for (const [c, p] of Object.entries(d.products)) {
+    const bl = (p.blades || []).map(i => byId[i]).filter(Boolean);
+    const chip = bl.find(isChip), main = bl.find(b => b.part === '主刃' || b.part === '金屬戰刃');
+    if (chip && main && !p.random) CX.push({ name: chip.zh + main.zh, code: c, main: main.id, chip: chip.id });
+    for (const v of p.variants || []) {
+      const vb = byId[v.blade];
+      if (vb && (vb.part === '主刃' || vb.part === '金屬戰刃')) {
+        const nm = v.name.split(' ')[0].replace(/（.*?）/g, '');
+        const ch = d.blades.filter(isChip).sort((a, b) => b.zh.length - a.zh.length).find(x => nm.startsWith(x.zh));
+        CX.push({ name: nm, code: c, main: vb.id, chip: ch ? ch.id : null });
+      }
+    }
+  }
   const t = d.tier;
   $('#foot').innerHTML = `強度：<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a>（${esc(t.author)}，${esc(t.updated)}）<br>` +
     `熱門度、冠軍率：<a href="${esc(d.usage.url)}" target="_blank" rel="noopener">BEYWATCH.GG</a> 國外比賽統計（到 ${esc(d.usage.through)}）<br>` +
-    (d.sheet ? `原裝配置、別名、比賽常勝組合：<a href="${esc(d.sheet.url)}" target="_blank" rel="noopener">stan-yao Beyblade X 天梯</a><br>` : '') +
+    (d.sheet ? `圖片、原裝配置、別名、比賽常勝組合：<a href="${esc(d.sheet.url)}" target="_blank" rel="noopener">stan-yao Beyblade X 天梯</a><br>` : '') +
     `型號、名稱：<a href="https://beybladehub.app/parts/blades" target="_blank" rel="noopener">BeybladeHub 上蓋資料庫</a>・每週自動更新，上次 ${esc(d.updated)}`;
-  const u = new URLSearchParams(location.search).get('q');
-  if (u) $('#q').value = u;
+  const us = new URLSearchParams(location.search), u = us.get('q');
+  if (u) { $('#q').value = u; pick = us.get('id'); }
+  history.replaceState({ q: u || '', pick, deep: false }, '', location.href);
   render();
 }).catch(() => { $('#view').innerHTML = '<p class="empty">資料載入失敗，稍後再試</p>'; renderMine(); });
 renderMine();
