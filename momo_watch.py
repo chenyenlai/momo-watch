@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""戰鬥陀螺新品監測：MOMO 上的 FUNBOX（funbox toys 品牌館）、FUNBOX 官網和墊腳石 TCSB，有新品或補貨就推播到手機（ntfy）。
+"""戰鬥陀螺新品監測：MOMO 上的 FUNBOX（funbox toys 品牌館）和 FUNBOX 官網，有新品或補貨就推播到手機（ntfy）。
 
 只用 Python 內建模組，NAS / Docker / 一般電腦都能跑。
 
@@ -13,13 +13,11 @@
 FUNBOX 的預購商品會記下開賣時間，開賣前 REMIND_BEFORE 分鐘再提醒一次。
 """
 
-import http.cookiejar
 import json
 import os
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -47,15 +45,6 @@ SHOP_FEEDS = [
 ]
 SHOP_SKIP = ['APP兌換']
 SHOP_RESTOCK = False  # True = 庫存從 0 變有貨也通知
-
-# 墊腳石 TCSB（tcsb.com.tw，Bagisto）：搜尋「戰鬥陀螺」，新品上架、售完變可購買都通知
-# 網站搜尋結果和商品頁的「有貨」不準（加進購物車才顯示庫存不足），所以用匿名購物車確認真正庫存
-TCSB_QUERY = '戰鬥陀螺'
-TCSB_PAGES = 1       # 每頁 36 件（網站只接受 limit=36）；陀螺都排在第 1 頁
-TCSB_EVERY = 55          # 搜尋新品：至少隔幾秒查一次（NAS 每分鐘跑 = 每分鐘查）
-TCSB_STOCK_EVERY = 180   # 確認舊商品有沒有補貨：至少隔幾秒一次（要加購物車，查太密會被回 429）；新品一出現就馬上確認
-TCSB_INCLUDE = ['beyblade', 'takara']  # 標題要有其中一個，排除同名的書、FUNKO 公仔、遊戲片
-TCSB_RESTOCK = True  # True = 售完變可購買也通知
 
 REMIND_BEFORE = int(os.environ.get('REMIND_BEFORE', '15'))  # 開賣前幾分鐘提醒；0 = 不提醒
 
@@ -237,118 +226,6 @@ def check_shop(state, dry_run=False):
             log('官網補貨：', k, it['name'])
 
 
-def fetch_tcsb():
-    found = {}
-    for page in range(1, TCSB_PAGES + 1):
-        url = 'https://www.tcsb.com.tw/api/products?query=%s&sort=created_at-desc&limit=36&page=%d' % (
-            urllib.parse.quote(TCSB_QUERY), page)
-        req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': 'application/json'})
-        data = json.loads(urllib.request.urlopen(req, timeout=30).read().decode('utf-8'))
-        for p in data.get('data', []):
-            name = (p.get('name') or '').strip()
-            if not any(k in name.lower() for k in TCSB_INCLUDE):
-                continue
-            final = ((p.get('prices') or {}).get('final') or {}).get('price')
-            found[str(p['id'])] = {
-                'name': name,
-                'price': final if final is not None else p.get('min_price'),
-                'saleable': bool(p.get('is_saleable')),
-                'url': 'https://www.tcsb.com.tw/' + (p.get('url_key') or p.get('sku') or ''),
-            }
-        if page >= (data.get('meta') or {}).get('last_page', 1):
-            break
-        time.sleep(1)
-    if not found:
-        raise RuntimeError('一件陀螺都沒抓到，可能網站改版')
-    return found
-
-
-def tcsb_real_stock(found, ids):
-    """把 ids（網站標「有貨」的）放進一個新的匿名購物車，看是否顯示庫存不足，結果寫回 found；有問題就丟錯"""
-    if not ids:
-        return
-    jar = http.cookiejar.CookieJar()
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-    base = 'https://www.tcsb.com.tw/api/checkout/cart'
-    hdr = {'User-Agent': UA, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
-    opener.open(urllib.request.Request(base + '/mini', headers=hdr), timeout=30).read()  # 拿 session 和 XSRF cookie
-    xsrf = next((urllib.parse.unquote(c.value) for c in jar if c.name == 'XSRF-TOKEN'), '')
-    if not xsrf:
-        raise RuntimeError('拿不到 XSRF-TOKEN，可能網站改版')
-    post_hdr = dict(hdr, **{'Content-Type': 'application/json', 'X-XSRF-TOKEN': xsrf})
-    for k in ids:
-        time.sleep(1)
-        body = json.dumps({'product_id': int(k), 'quantity': 1, 'is_buy_now': 0}).encode('utf-8')
-        try:
-            opener.open(urllib.request.Request(base, data=body, headers=post_hdr), timeout=30).read()
-        except urllib.error.HTTPError as e:
-            if e.code != 400:  # 400 = 加不進購物車（超過可購買數量 = 沒貨）
-                raise
-            found[k]['saleable'] = False
-    time.sleep(1)
-    cart = json.loads(opener.open(urllib.request.Request(base, headers=hdr), timeout=30).read().decode('utf-8'))
-    items = {str(i.get('product_id')): i for i in ((cart.get('data') or {}).get('items') or [])}
-    for k in ids:
-        if found[k]['saleable']:
-            i = items.get(k)
-            found[k]['saleable'] = bool(i) and not i.get('stock_insufficient')
-
-
-def check_tcsb(state, dry_run=False):
-    """墊腳石 TCSB：新陀螺一上架就通知（不管有沒有貨）；TCSB_RESTOCK 開啟時，售完變可購買也通知"""
-    now = time.time()
-    if not dry_run:
-        if now - state.get('tcsb_at', 0) < TCSB_EVERY - 5:
-            return
-        state['tcsb_at'] = now
-    try:
-        found = fetch_tcsb()
-    except Exception as e:
-        log('TCSB 檢查失敗：', e)
-        return
-    known = state.get('tcsb')
-    if known is None:
-        known = {}
-    # 要用購物車確認的：網站標有貨的新品（馬上）＋ 隔 TCSB_STOCK_EVERY 秒的舊商品
-    full = dry_run or now - state.get('tcsb_stock_at', 0) >= TCSB_STOCK_EVERY - 5
-    ids = [k for k, it in found.items() if it['saleable'] and (full or k not in known)]
-    try:
-        tcsb_real_stock(found, ids)
-        checked = set(ids)
-        if full and not dry_run:
-            state['tcsb_stock_at'] = now
-    except Exception as e:
-        log('TCSB 庫存確認失敗（新品照樣通知，補貨這輪不判斷）：', e)
-        checked = set()
-    for k, it in found.items():
-        if it['saleable'] and k not in checked:  # 沒確認到的：舊商品沿用上次結果，新品標「未確認」
-            it['saleable'] = known[k].get('saleable') if k in known else None
-    if dry_run:
-        for k, it in found.items():
-            log('TCSB %s  $%s  %s  %s' % (k, it['price'], tcsb_status(it['saleable']), it['name']))
-        return
-    first = state.get('tcsb') is None
-    state['tcsb'] = {k: {'name': it['name'], 'saleable': it['saleable']} for k, it in found.items()}
-    if first:  # 第一次只記錄
-        log('TCSB 第一次執行，記錄 %d 件' % len(found))
-        return
-    for k, it in found.items():
-        msg = '%s\n$%s｜%s\n%s' % (short_name(it['name']), it['price'], tcsb_status(it['saleable']), it['url'])
-        if k not in known:
-            if it['saleable']:
-                notify('墊腳石新陀螺上架，可購買！快搶', msg, click=it['url'], tags=['rotating_light'], priority=5)
-            else:
-                notify('墊腳石新陀螺上架', msg, click=it['url'], tags=['tada'], priority=4)
-            log('TCSB 新品：', k, it['name'])
-        elif TCSB_RESTOCK and k in checked and it['saleable'] and known[k].get('saleable') is False:
-            notify('墊腳石陀螺補貨了！快搶', msg, click=it['url'], tags=['rotating_light'], priority=5)
-            log('TCSB 補貨：', k, it['name'])
-
-
-def tcsb_status(saleable):
-    return {True: '可購買', False: '目前沒貨（先加購物車或收藏）', None: '庫存未確認'}[saleable]
-
-
 def wanted(name):
     low = name.lower()
     return any(k in low for k in INCLUDE) and not any(k in low for k in EXCLUDE)
@@ -400,11 +277,9 @@ def check(dry_run=False):
     if state is not None and not dry_run:
         send_reminders(state)
         check_shop(state)
-        check_tcsb(state)
         save_state(state)
     if dry_run:
         check_shop({}, dry_run=True)
-        check_tcsb({}, dry_run=True)
     try:
         found = collect()
         if not found:
@@ -427,7 +302,6 @@ def check(dry_run=False):
     if state is None:
         state = {'seen': {k: v['name'] for k, v in found.items()}, 'fails': 0, 'upcoming': {}}
         check_shop(state)
-        check_tcsb(state)
         # 找出目前已上架、還沒開賣的目標商品，之後才能提醒
         for it in found.values():
             if it['id'].startswith('TP'):
