@@ -466,7 +466,7 @@ function render() {
     const top = D.blades.filter(b => b.tier && b.tier.level <= 1).sort((a, b) => a.tier.level - b.tier.level);
     x += `<p class="meta">輸入型號（UX-03）、中文、英文或日文名稱，或固鎖、軸心（1-60、LR）。目前台灣 T 表最強：</p><div class="chips">`;
     x += top.map(b => `<button class="chip" data-q="${esc(b.code || b.zh)}">${esc(b.tier.label)} ${esc(b.zh)}</button>`).join('');
-    x += `</div>` + allList();
+    x += `</div>` + (typing ? '' : allList());
   } else if (r.code) {
     if (r.prod || r.blades.length > 1) {
       const P = r.prod || {}, key = 'p:' + r.code;
@@ -565,7 +565,8 @@ function renderMine() {
 }
 
 // ---------- 事件 ----------
-let timer = null;
+let timer = null, typing = false;
+$('#q').addEventListener('blur', () => { if (typing) { typing = false; if (!$('#q').value.trim()) render(); } });
 // 上一頁：每次「點進去」都記一筆瀏覽紀錄，按上一頁回到表（和原本捲到的位置），不會跳出這頁
 function urlOf(q, pk) {
   const u = new URLSearchParams();
@@ -582,13 +583,13 @@ function go(q, pk) {
 window.addEventListener('popstate', (e) => {
   const st = e.state || {}, u = new URLSearchParams(location.search);
   $('#q').value = st.q != null ? st.q : (u.get('q') || '');
-  pick = st.pick || u.get('id') || null; openForm = null;
+  pick = st.pick || u.get('id') || null; openForm = null; typing = false;
   render(); window.scrollTo(0, st.y || 0);
 });
 $('#q').addEventListener('input', () => {
   clearTimeout(timer); openForm = null;
   const q = $('#q').value.trim(), st = history.state || {};
-  if (!q && st.deep) { history.back(); return; }   // 清空搜尋框＝回上一頁
+  typing = !q;   // 刪光了還在打字：先別跳回首頁、也別冒出整張表
   if (q && !st.deep) {   // 從首頁開始打字：記一筆，上一頁可以回首頁
     history.replaceState(Object.assign({}, st, { y: window.scrollY }), '', location.href);
     history.pushState({ q, deep: true }, '', urlOf(q));
