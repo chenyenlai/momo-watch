@@ -386,7 +386,7 @@ function partCard(kind, key) {
 }
 
 // ---------- 全部陀螺表 ----------
-let L = { type: '', sort: 'tier', mine: false };
+let L = { type: '', ser: '', sort: 'tier', mine: false };
 try { L = Object.assign(L, JSON.parse(localStorage.getItem('bey-list')) || {}); } catch (e) {}
 let pick = null;   // 從表點進去的那顆（名字太短會跟零件撞名，所以直接用 id）
 const CX_PARTS = ['主刃', '金屬戰刃', '超越戰刃', '輔助戰刃'];
@@ -405,6 +405,7 @@ function allList() {
         n: S.recs.filter(r => r.code === e.code && (r.blades || []).includes(m.id)).length });
     }
   }
+  if (L.ser) bs = bs.filter(o => (o.code || '').startsWith(L.ser));   // BX 也含 BXG、BXA 等限定
   if (L.mine) bs = bs.filter(o => o.n);
   const lv = (o) => o.b.tier ? o.b.tier.level : 99, use = (o) => o.b.stats && o.b.stats.usage != null ? o.b.stats.usage : -1;
   const cmp = { tier: (a, b) => lv(a) - lv(b) || use(b) - use(a), hot: (a, b) => use(b) - use(a) || lv(a) - lv(b),
@@ -413,6 +414,7 @@ function allList() {
   const ch = (k, v, t) => `<button class="chip${L[k] === v ? ' sel' : ''}" data-l="${k}" data-v="${esc(String(v))}">${t}</button>`;
   let x = `<section class="card all"><h2>全部陀螺（${bs.length}）</h2><div class="chips">` +
     [['', '全部'], ['攻擊', '攻擊'], ['防守', '防守'], ['持久', '持久'], ['均衡', '均衡'], ['CX', 'CX 零件']].map(([v, t]) => ch('type', v, t)).join('') +
+    `</div><div class="chips">` + [['', '全系列'], ['BX', 'BX'], ['UX', 'UX'], ['CX', 'CX']].map(([v, t]) => ch('ser', v, t)).join('') +
     `</div><div class="chips">` + [['tier', '依強度'], ['hot', '依熱門'], ['code', '依型號']].map(([v, t]) => ch('sort', v, t)).join('') +
     `<button class="chip${L.mine ? ' sel' : ''}" data-l="mine" data-v="${L.mine ? '' : '1'}">✓ 只看我有的</button></div><ul>`;
   x += bs.map(o => {
