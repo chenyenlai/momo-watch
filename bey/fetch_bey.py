@@ -184,6 +184,11 @@ def parse_hub_product(page):
     price = m(r'台灣 NT\$ ([\d,]+)')
     release = m(r'發售日 (\d{4}-\d{2}-\d{2})')
     config = m(r'原裝配置 (\S+)')
+    if not config:   # 沒有「原裝配置」欄（UX-20 這種固鎖一體的）：用規格速覽的固鎖＋軸心
+        spec = s[s.find('規格速覽'):s.find('零件詳解')] if '規格速覽' in s else ''
+        rr, bb = re.search(r' 固鎖 ([\d-]+)', spec), re.search(r' 軸心 ([A-Za-z]+)（', spec)
+        if bb:
+            config = re.match(r'(.*)', (rr.group(1) if rr else '') + bb.group(1))
     blade = m(r'規格速覽.*?上蓋 (\S+?)（')
     variants = []
     i = page.find('包含款式')
@@ -205,7 +210,7 @@ def parse_hub_product(page):
         'blade': blade.group(1) if blade else '', 'variants': variants,
         # 說明裡出現的所有配置（一盒多顆的套組、CX 沒有「原裝配置」欄位時用來算零件稀有度）
         'configs': sorted(set(re.findall(r'(?<![\w-])([A-Z]{0,2}(?:\d|M)-\d{2}[A-Z][A-Za-z]{0,2})(?![\w-])',
-                                         s.split('相關商品')[0]))),
+                                         re.split(r'用在哪些配置|配這顆要的零件去哪拿|相關商品', s)[0]))),   # 後面是別的商品、推薦改造，不算
     }
 
 # ---------------------------------------------------------------------------
@@ -300,6 +305,16 @@ def add_sheet(data):
             if [r, b] not in lst:
                 lst.append([r, b])
     data['orig'] = orig
+    for code, lst in orig.items():   # 套組的每一顆（UX-10 的 3-85BS）也算進零件「哪裡有」
+        pc = code if code in data['products'] else re.sub(r'-\d\d$', '', code)
+        if pc not in data['products']:
+            continue
+        for r, b in lst:
+            for kind, key in (('ratchet', r), ('bit', b)):
+                if key:
+                    d = data['parts'][kind].setdefault(key, {'name': key, 'in': []})
+                    if pc not in d.setdefault('in', []):
+                        d['in'].append(pc)
     # 別名：名字一樣直接對；不一樣用型號／商品對到唯一一顆
     blades, P = data['blades'], data['products']
     by_zh = {b['zh']: b for b in blades}

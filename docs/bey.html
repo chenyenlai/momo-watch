@@ -346,6 +346,12 @@ function beyCard(b, rec) {
     }).join('')}</ol>${S.recs.length && b.combos.slice(0, 3).some(([rr, bb]) => (!rr || mp.has('ratchet|' + rr)) && mp.has('bit|' + bb))
       ? '<small>✓ 綠色是你手上零件就能組的</small>' : ''}</dd>`;
   }
+  const sold = Object.entries(D.products).filter(([c, p]) => !p.random && !/-00$/.test(c) && (p.blades || []).includes(b.id))   // XX-00 是各種限定款的總稱，不算
+    .sort(([a], [c]) => a.localeCompare(c, 'en', { numeric: true }));
+  if (sold.length) x += `<dt>原裝配置</dt><dd>${sold.slice(0, 6).map(([c, p]) => {   // 單賣、套組裡附的固鎖＋軸心
+    const cfg = (p.blades || []).length > 1 ? '' : (D.orig && D.orig[c] || []).map(([rr, bb]) => (rr || '') + bb).join('／') || p.config || '';
+    return `<button class="chip" data-q="${esc(c)}">${esc(c + ' ' + p.name)}${cfg ? '：' + esc(cfg) : ''}</button>`;
+  }).join(' ')}</dd>`;
   x += `<dt>熱門度</dt><dd>${esc(h.text)}</dd>`;
   if (st && st.first != null) x += `<dt>冠軍率</dt><dd>${st.first}%` + (st.recent ? `（近 90 天第 ${st.recent.rank} 名／${st.recent.of} 顆）` : '') + `</dd>`;
   const packs = Object.entries(D.products).filter(([c, p]) => p.random && (p.blades || []).includes(b.id));
