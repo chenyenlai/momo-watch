@@ -41,6 +41,7 @@ BW_PARTS = BW + '/sitemaps/parts.xml'
 SHEET = 'https://docs.google.com/spreadsheets/d/1TBHOpcsv25bBfWERq14CBIy4P1G7j-qpPhmclx_nTWI/gviz/tq?tqx=out:csv'
 COMBO_SHEET = 'https://docs.google.com/spreadsheets/d/18eTJLjyNmqDz5MH0-VD03TX4wobUCdHdrRMyo4uojDo/gviz/tq?tqx=out:csv&sheet=Combo%20Summary'
 PARTS_SHEET = SHEET + '&sheet=%E9%9B%B6%E4%BB%B6%E5%9C%96%E9%91%91'   # 零件圖鑑：固鎖、軸心的圖
+OFFICIAL_LINEUP = 'https://beyblade.takaratomy.co.jp/beyblade-x/lineup/'   # 官網商品一覽：BX-00／UX-00／CX-00 限定款的真正型號（BXG-xx）
 SHEET_PAGE = 'https://stan-yao.github.io/beyblade_x_tier/'
 TW = timezone(timedelta(hours=8))
 CACHE = None
@@ -292,6 +293,9 @@ def add_sheet(data):
     if len(rows) < 100:
         print('stan-yao 試算表只有 %d 列，格式可能變了，先不用' % len(rows), file=sys.stderr)
         return
+    for c in [c for c, p in data['products'].items() if p.get('special') or p.get('set')]:
+        del data['products'][c]   # 上次加的限定款先清掉再重做（--sheet-only 重跑時）
+    add_official00(data)
     add_specials(data, rows)
     bits = {k.lower(): k for k in data['parts']['bit']}
     orig = {}
@@ -306,6 +310,9 @@ def add_sheet(data):
             lst = orig.setdefault(code, [])
             if [r, b] not in lst:
                 lst.append([r, b])
+    for c, p in data['products'].items():   # 官網限定款：以官網標的配置為準（試算表的 BXG 型號偶爾對錯）
+        if p.get('cfgs'):
+            orig[c] = p['cfgs']
     data['orig'] = orig
     for code, lst in orig.items():   # 套組的每一顆（UX-10 的 3-85BS）也算進零件「哪裡有」
         pc = code if code in data['products'] else re.sub(r'-\d\d$', '', code)
@@ -376,13 +383,99 @@ def add_sheet(data):
         len(rows), len(orig), sum(1 for b in blades if b.get('alias')), len(best)))
 
 
+# 官網日文 → 中文（限定款名稱後面的塗裝、版本）
+JA_WORDS = [('メタルコート', '金屬塗層'), ('サムライブルー', '武士藍'), ('サッカー日本代表', '足球日本代表'), ('ジャイアンツ', '巨人隊'),
+            ('FCバルセロナ', '巴塞隆納'), ('Jリーグ', 'J 聯盟'), ('バージョン2.0', '2.0 版'), ('ゴールド', '金'), ('ブラック', '黑'),
+            ('ブルー', '藍'), ('ホワイト', '白'), ('レッド', '紅'), ('イエロー', '黃'), ('オレンジ', '橘'), ('ネイビー', '海軍藍'),
+            ('マゼンタ', '洋紅'), ('クリア', '透明'), ('ガンメタ', '鐵灰'), ('Ver.', '版')]
+JA_KIND = {'ブースター': '增強包', 'スターター': '入門組', 'ダブルスターター': '雙入門組', 'ランダムブースター': '隨機強化組',
+           'カラーチョイスブースター': '選色增強包', 'セット': '套組'}
+# CX 零件沒有日文名：片假名 → 英文名，再對到中文
+CX_JA = {'ドラン': 'Dran', 'ブレイブ': 'Brave', 'ウィザード': 'Wizard', 'アーク': 'Arc', 'ペガサス': 'Pegasus', 'ブラスト': 'Blast',
+         'ティガ': 'Tiga', 'レイジ': 'Rage', 'ワルキューレ': 'Valkyrie', 'ボルト': 'Volt', 'バハムート': 'Bahamut', 'ブリッツ': 'Blitz',
+         'バックス': 'Bucks', 'アントラーズ': 'Antler', 'クラーケン': 'Kraken', 'リグル': 'Wriggle', 'ホーネット': 'Hornet',
+         'フォート': 'Fort', 'ドレイク': 'Drake'}
+
+
+def add_official00(data):
+    """官網商品一覽裡的 BX-00／UX-00／CX-00：每款各自的型號（BXG-51…）、配置、價格、發售日。工具、貼紙不算"""
+    try:
+        page = get(OFFICIAL_LINEUP)
+    except Exception as e:
+        print('官網商品一覽抓不到', type(e).__name__, file=sys.stderr)
+        return
+    bits = {k.lower(): k for k in data['parts']['bit']}
+    ja = sorted([b for b in data['blades'] if b.get('ja') and not b.get('part')], key=lambda b: -len(b['ja']))
+    cx = [b for b in data['blades'] if b.get('part') in ('鎖定紋章', '主刃', '金屬戰刃')]
+    assists = {b['zh']: b for b in data['blades'] if b.get('part') == '輔助戰刃'}
+    cfg_rx = r'([A-Z]{0,2}(?:\d|M)-\d\d[A-Z][A-Za-z]{0,2}|[A-Z]{1,2}[a-z]?)$'
+    n = 0
+    for li in re.findall(r'<li class="[^"]*"[^>]*>(.*?)</li>', page, re.S):
+        m = re.search(r'<b>([BUC]X-00)<span>(.*?)</span></b>', li, re.S)
+        img = re.search(r'_image/(BX[GHA])(\d+)_list', li)
+        cat = re.search(r'class="category"><span>(.*?)</span>', li)
+        if not (m and img and cat) or cat.group(1) == 'ツール':
+            continue
+        code = img.group(1) + '-' + img.group(2).zfill(2)
+        title = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', m.group(2)))).strip()
+        t = re.sub(r'【[^】]*】\s*', '', title)
+        head, _, tail = t.partition(' ') if '/' not in t else (t, '', '')
+        blades, names, cfgs, raw, bcfg = [], [], [], [], {}
+        for piece in head.split('/'):
+            piece = re.sub(r'^(マーベル|スター・ウォーズ|トランスフォーマー|ジュラシック・ワールド) ', '', piece.strip())
+            c = re.search(cfg_rx, piece)
+            cfg = c.group(1) if c and (re.search(r'\d', c.group(1)) or c.group(1).lower() in bits or len(c.group(1)) > 1) else ''
+            word = piece[:len(piece) - len(cfg)].replace(' ', '') if cfg else piece.replace(' ', '')
+            b = next((b for b in ja if b['ja'].replace('・', '') == word.replace('・', '')), None)
+            if b:
+                blades.append(b['id']); names.append(b['zh'])
+                if cfg:
+                    bcfg[b['id']] = cfg
+            elif cfg:   # CX：紋章＋主刃（＋輔助戰刃）
+                ws = sorted([w for w in CX_JA if w in word], key=word.find)
+                ps = [next((x for x in cx if x['en'] == CX_JA[w]), None) for w in ws]
+                if ps and all(ps) and ''.join(ws) == word:
+                    blades += [x['id'] for x in ps]; names.append(''.join(x['zh'] for x in ps))
+                else:
+                    names.append(word)   # 新出的、還沒中文名的零件：先用日文
+            else:
+                continue
+            if cfg:
+                raw.append(cfg)
+                a, r, bt = split_config(cfg)
+                if not bt and cfg.lower() in bits:
+                    a, r, bt = None, None, bits[cfg.lower()]
+                elif not bt:
+                    a, r, bt = None, None, None
+                if a and a in assists and blades and any(x['id'] == blades[-1] for x in cx):
+                    blades.append(assists[a]['id'])
+                if bt:
+                    cfgs.append([r or '', bits.get(bt.lower(), bt)])
+        if not names:
+            continue
+        for ja_w, zh_w in JA_WORDS:
+            tail = tail.replace(ja_w, zh_w)
+        rel = re.search(r'(\d{4})\.(\d{1,2})\.(\d{1,2})', li)
+        price = re.search(r'<i>¥([\d,]+)', li)
+        data['products'][code] = {
+            'name': '／'.join(names) + (' ' + tail if tail else ''), 'en': title, 'maker': 'Takara Tomy',
+            'line': m.group(1) + ' 限定', 'kind': JA_KIND.get(cat.group(1), cat.group(1)), 'price': None,
+            'priceJP': int(price.group(1).replace(',', '')) if price else None,
+            'release': '%s-%02d-%02d' % (rel.group(1), int(rel.group(2)), int(rel.group(3))) if rel else '',
+            'config': raw[0] if len(raw) == 1 else '',
+            'blades': list(dict.fromkeys(blades)), 'random': False, 'variants': [],
+            'url': OFFICIAL_LINEUP + re.search(r'href="([^"]+)"', li).group(1), 'special': True, 'official': True,
+            'series00': m.group(1), 'cfgs': cfgs, 'bladeCfg': bcfg,
+        }
+        n += 1
+    print('官網限定款 %d 個' % n)
+
+
 SET_NAMES = {'BXG-57': '福音戰士改造組（EVA 3 顆）'}   # 官方：エヴァンゲリオンデッキセット
 
 
 def add_specials(data, rows):
     """BeybladeHub 收在 CX-00 底下的限定 CX（福音戰士 BXG-57-01 等）：試算表有各自的型號和配置，做成可以記錄的商品"""
-    for c in [c for c, p in data['products'].items() if p.get('special') or p.get('set')]:
-        del data['products'][c]   # 上次加的先清掉再重做（--sheet-only 重跑時）
     flat = lambda t: unicodedata.normalize('NFKC', t).replace(' ', '').replace('EVA', '')
     chips = [b for b in data['blades'] if b.get('part') == '鎖定紋章' and (b.get('code') or '').endswith('-00')]
     mains = sorted([b for b in data['blades'] if b.get('part') in ('主刃', '金屬戰刃')], key=lambda b: -len(b['zh']))

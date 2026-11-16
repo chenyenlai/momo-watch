@@ -352,8 +352,8 @@ function beyCard(b, rec) {
   }
   const sold = Object.entries(D.products).filter(([c, p]) => !p.random && !/-00$/.test(c) && (p.blades || []).includes(b.id))   // XX-00 是各種限定款的總稱，不算
     .sort(([a], [c]) => a.localeCompare(c, 'en', { numeric: true }));
-  if (sold.length) x += `<dt>原裝配置</dt><dd>${sold.slice(0, 6).map(([c, p]) => {   // 單賣、套組裡附的固鎖＋軸心
-    const cfg = (p.blades || []).length > 1 ? '' : (D.orig && D.orig[c] || []).map(([rr, bb]) => (rr || '') + bb).join('／') || p.config || '';
+  if (sold.length) x += `<dt>原裝配置</dt><dd>${sold.slice(0, 10).map(([c, p]) => {   // 單賣、套組裡附的固鎖＋軸心
+    const cfg = (p.bladeCfg || {})[b.id] || ((p.blades || []).length > 1 ? '' : (D.orig && D.orig[c] || []).map(([rr, bb]) => (rr || '') + bb).join('／') || p.config || '');
     return `<button class="chip" data-q="${esc(c)}">${esc(c + ' ' + p.name)}${cfg ? '：' + esc(cfg) : ''}</button>`;
   }).join(' ')}</dd>`;
   x += `<dt>熱門度</dt><dd>${esc(h.text)}</dd>`;
@@ -503,12 +503,13 @@ function render() {
   } else if (r.code) {
     if (r.prod || r.blades.length > 1) {
       const P = r.prod || {}, key = 'p:' + r.code;
-      const name = P.kind ? P.name : prodName(r.code, r.blades);
+      const all00 = /-00$/.test(r.code);   // BX-00 這種總稱：BeybladeHub 的名字、配置只是其中一款，不顯示
+      const name = all00 ? '限定款、特別版（總稱）' : P.kind ? P.name : prodName(r.code, r.blades);
       recTargets[key] = { code: r.code, name, blades: r.blades.map(b => b.id), key, variants: P.random ? P.variants : null };
       const lvOf = (b) => b && b.tier ? b.tier.level : 99;
       x += `<div class="card"><h2>${P.random ? '🎲 抽抽包' : '商品'}</h2><div class="prod"><b>${esc(r.code)} ${esc(name)}</b>`;
-      const info = [P.kind, P.price ? 'NT$' + P.price : '', P.release ? P.release.slice(0, 7).replace('-', '/') + ' 發售' : ''].filter(Boolean);
-      if (info.length) x += `<br>${esc(info.join('・'))}`;
+      const info = [P.kind, P.price ? 'NT$' + P.price : P.priceJP ? '日本 ¥' + P.priceJP.toLocaleString() : '', P.official ? '官網：' + P.series00 + ' 限定款' : '', P.release ? P.release.slice(0, 7).replace('-', '/') + ' 發售' : ''].filter(Boolean);
+      if (info.length && !all00) x += `<br>${esc(info.join("・"))}`;
       if (P.random) {
         // 每一款：強度、官方稀有、最值得抽
         const vs = P.variants.map(v => ({ v, b: byId[v.blade] }));
@@ -546,13 +547,15 @@ function render() {
       } else {
         const best = r.blades.filter(b => !isChip(b)).sort((a, b) => lvOf(a) - lvOf(b))[0];
         const v = best ? verdict(best) : null;
-        if (P.en) x += `<br>${esc(P.en)}`;
+        if (P.en && !all00) x += `<br>${esc(P.en)}`;
         x += `<br>內含：${r.blades.map(b => esc(b.zh) + (b.tier ? ' ' + esc(b.tier.label) : isChip(b) ? '（紋章）' : '')).join('、')}</div>`;
-        if (P.config) x += `<dl class="rows"><dt>原裝配置</dt><dd>${esc(P.config)} ${cfgMarks(P.config)}</dd>${cfgRows(P.config)}</dl>`;
+        if (P.config && !all00) x += `<dl class="rows"><dt>原裝配置</dt><dd>${esc(P.config)} ${cfgMarks(P.config)}</dd>${cfgRows(P.config)}</dl>`;
         if (v && r.blades.length > 1 && !/-00$/.test(r.code)) x += `<div class="verdict ${v.cls}">${esc(v.title)}<small>${esc(best.zh)}：${esc(v.why)}</small></div>`;
       }
       const multi = /-00$/.test(r.code);   // XX-00 是各種限定款的總稱，不是一盒商品
-      const sp = multi ? Object.entries(D.products).filter(([c, p]) => p.special && (p.blades || []).some(i => r.blades.some(b => b.id === i))) : [];
+      const sp = multi ? Object.entries(D.products).filter(([c, p]) => p.series00 ? p.series00 === r.code
+        : (p.special || p.set) && (p.blades || []).some(i => r.blades.some(b => b.id === i)))
+        .sort(([a, x], [b, y]) => (y.release || '').localeCompare(x.release || '')) : [];   // 新的在前
       if (multi) x += `<p class="meta">${esc(r.code)} 是各種限定款、特別版的總稱，不是同一盒。` +
         (sp.length ? `點你買的那款再按「＋我買了」：</p><div class="chips">${sp.map(([c, p]) =>
           `<button class="chip" data-q="${esc(c)}">${esc(c + ' ' + p.name)}</button>`).join('')}</div><p class="meta">清單裡沒有的，在下面找那顆按它的「＋我買了」。</p>`
