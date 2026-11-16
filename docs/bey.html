@@ -386,7 +386,7 @@ function partCard(kind, key) {
 }
 
 // ---------- 全部陀螺表 ----------
-let L = { type: '', sort: 'tier', mine: false };
+let L = { type: '', ser: '', sort: 'tier', mine: false };
 try { L = Object.assign(L, JSON.parse(localStorage.getItem('bey-list')) || {}); } catch (e) {}
 let pick = null;   // 從表點進去的那顆（名字太短會跟零件撞名，所以直接用 id）
 const CX_PARTS = ['主刃', '金屬戰刃', '超越戰刃', '輔助戰刃'];
@@ -405,6 +405,7 @@ function allList() {
         n: S.recs.filter(r => r.code === e.code && (r.blades || []).includes(m.id)).length });
     }
   }
+  if (L.ser) bs = bs.filter(o => (o.code || '').startsWith(L.ser));   // BX 也含 BXG、BXA 等限定
   if (L.mine) bs = bs.filter(o => o.n);
   const lv = (o) => o.b.tier ? o.b.tier.level : 99, use = (o) => o.b.stats && o.b.stats.usage != null ? o.b.stats.usage : -1;
   const cmp = { tier: (a, b) => lv(a) - lv(b) || use(b) - use(a), hot: (a, b) => use(b) - use(a) || lv(a) - lv(b),
@@ -413,6 +414,7 @@ function allList() {
   const ch = (k, v, t) => `<button class="chip${L[k] === v ? ' sel' : ''}" data-l="${k}" data-v="${esc(String(v))}">${t}</button>`;
   let x = `<section class="card all"><h2>全部陀螺（${bs.length}）</h2><div class="chips">` +
     [['', '全部'], ['攻擊', '攻擊'], ['防守', '防守'], ['持久', '持久'], ['均衡', '均衡'], ['CX', 'CX 零件']].map(([v, t]) => ch('type', v, t)).join('') +
+    `</div><div class="chips">` + [['', '全系列'], ['BX', 'BX'], ['UX', 'UX'], ['CX', 'CX']].map(([v, t]) => ch('ser', v, t)).join('') +
     `</div><div class="chips">` + [['tier', '依強度'], ['hot', '依熱門'], ['code', '依型號']].map(([v, t]) => ch('sort', v, t)).join('') +
     `<button class="chip${L.mine ? ' sel' : ''}" data-l="mine" data-v="${L.mine ? '' : '1'}">✓ 只看我有的</button></div><ul>`;
   x += bs.map(o => {
@@ -466,7 +468,7 @@ function render() {
     const top = D.blades.filter(b => b.tier && b.tier.level <= 1).sort((a, b) => a.tier.level - b.tier.level);
     x += `<p class="meta">輸入型號（UX-03）、中文、英文或日文名稱，或固鎖、軸心（1-60、LR）。目前台灣 T 表最強：</p><div class="chips">`;
     x += top.map(b => `<button class="chip" data-q="${esc(b.code || b.zh)}">${esc(b.tier.label)} ${esc(b.zh)}</button>`).join('');
-    x += `</div>` + allList();
+    x += `</div>` + (typing ? '' : allList());
   } else if (r.code) {
     if (r.prod || r.blades.length > 1) {
       const P = r.prod || {}, key = 'p:' + r.code;
@@ -565,7 +567,8 @@ function renderMine() {
 }
 
 // ---------- 事件 ----------
-let timer = null;
+let timer = null, typing = false;
+$('#q').addEventListener('blur', () => { if (typing) { typing = false; if (!$('#q').value.trim()) render(); } });
 // 上一頁：每次「點進去」都記一筆瀏覽紀錄，按上一頁回到表（和原本捲到的位置），不會跳出這頁
 function urlOf(q, pk) {
   const u = new URLSearchParams();
@@ -582,13 +585,13 @@ function go(q, pk) {
 window.addEventListener('popstate', (e) => {
   const st = e.state || {}, u = new URLSearchParams(location.search);
   $('#q').value = st.q != null ? st.q : (u.get('q') || '');
-  pick = st.pick || u.get('id') || null; openForm = null;
+  pick = st.pick || u.get('id') || null; openForm = null; typing = false;
   render(); window.scrollTo(0, st.y || 0);
 });
 $('#q').addEventListener('input', () => {
   clearTimeout(timer); openForm = null;
   const q = $('#q').value.trim(), st = history.state || {};
-  if (!q && st.deep) { history.back(); return; }   // 清空搜尋框＝回上一頁
+  typing = !q;   // 刪光了還在打字：先別跳回首頁、也別冒出整張表
   if (q && !st.deep) {   // 從首頁開始打字：記一筆，上一頁可以回首頁
     history.replaceState(Object.assign({}, st, { y: window.scrollY }), '', location.href);
     history.pushState({ q, deep: true }, '', urlOf(q));
