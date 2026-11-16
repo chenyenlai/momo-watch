@@ -376,8 +376,13 @@ def add_sheet(data):
         len(rows), len(orig), sum(1 for b in blades if b.get('alias')), len(best)))
 
 
+SET_NAMES = {'BXG-57': '福音戰士改造組（EVA 3 顆）'}   # 官方：エヴァンゲリオンデッキセット
+
+
 def add_specials(data, rows):
     """BeybladeHub 收在 CX-00 底下的限定 CX（福音戰士 BXG-57-01 等）：試算表有各自的型號和配置，做成可以記錄的商品"""
+    for c in [c for c, p in data['products'].items() if p.get('special') or p.get('set')]:
+        del data['products'][c]   # 上次加的先清掉再重做（--sheet-only 重跑時）
     flat = lambda t: unicodedata.normalize('NFKC', t).replace(' ', '').replace('EVA', '')
     chips = [b for b in data['blades'] if b.get('part') == '鎖定紋章' and (b.get('code') or '').endswith('-00')]
     mains = sorted([b for b in data['blades'] if b.get('part') in ('主刃', '金屬戰刃')], key=lambda b: -len(b['zh']))
@@ -386,7 +391,7 @@ def add_specials(data, rows):
             for m in mains if c.get('code') and c['code'] == m.get('code')}   # 一般 CX 的組合名，限定版不要撞名
     for x in rows:
         code, name = x[0].strip(), x[1].strip()
-        if code in data['products'] and not data['products'][code].get('special'):
+        if code in data['products']:
             continue
         chip = next((c for c in chips if flat(c['zh']) and flat(c['zh']) in flat(name)), None)
         main = next((m for m in mains if m['zh'] in name), None)
@@ -405,6 +410,21 @@ def add_specials(data, rows):
         }
         if x[12].strip().startswith('https://'):
             data['products'][code]['img'] = x[12].strip()
+    # 一盒好幾顆的限定套組（BXG-57 福音戰士改造組＝零號機、初號機、2 號機）：整盒也能記
+    kids = {}
+    for c, p in data['products'].items():
+        if p.get('special') and re.search(r'-\d\d-\d\d$', c):
+            kids.setdefault(re.sub(r'-\d\d$', '', c), []).append(c)
+    for base, cs in kids.items():
+        if base not in SET_NAMES or len(cs) < 2 or (base in data['products'] and not data['products'][base].get('set')):   # 只有確定是一盒的才做
+            continue
+        cs.sort()
+        data['products'][base] = {
+            'name': SET_NAMES[base],
+            'en': '', 'maker': 'Takara Tomy', 'line': 'CX 限定', 'kind': '套組', 'price': None, 'release': '', 'config': '',
+            'blades': list(dict.fromkeys(i for c in cs for i in data['products'][c]['blades'])), 'random': False, 'variants': [],
+            'url': SHEET_PAGE, 'set': True, 'kids': cs,
+        }
 
 
 def add_part_imgs(data):

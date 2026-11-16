@@ -425,7 +425,7 @@ function allList() {
       seen.add(e.name);
       const ch = byId[e.chip];
       bs.push({ b: m, name: e.name, code: e.code, img: (D.cxImg || {})[e.name] || m.img, chipImg: ch && ch.img, cx: e, sub: m.type + '・CX',
-        n: S.recs.filter(r => r.code === e.code && (r.blades || []).includes(m.id)).length });
+        n: S.recs.filter(r => (r.code === e.code || (r.code && e.code.startsWith(r.code + '-'))) && (r.blades || []).includes(m.id)).length });   // 整盒 BXG-57 也算 BXG-57-02
     }
   }
   if (L.ser) bs = bs.filter(o => o.cx || o.b.part ? L.ser === 'CX' : (o.code || '').startsWith(L.ser));   // CX 組合（含 BXG 限定版）都算 CX   // BX 也含 BXG、BXA 等限定
@@ -479,7 +479,11 @@ function search(q) {
     if (exact.length === 1) return search(exact[0]);   // 名字完全一樣（蒼龍勇氣）：直接顯示那個商品
     const codes = [...new Set(cx.map(e => e.code))];
     if (codes.length === 1 && !hit.length) return search(codes[0]);   // 只有一個商品：直接顯示那個商品
-    var prods = codes.filter(c => D.products[c]);   // 好幾款（EVA）：先列商品讓你點
+    var prods = codes.filter(c => D.products[c]);
+    for (const c of prods.slice()) {   // 屬於同一盒套組（BXG-57-01 → BXG-57）：套組排前面
+      const base = c.replace(/-\d\d$/, '');
+      if (base !== c && D.products[base] && D.products[base].set && !prods.includes(base)) prods.unshift(base);
+    }   // 好幾款（EVA）：先列商品讓你點
     for (const e of cx) if (!hit.includes(byId[e.main])) hit.push(byId[e.main]);
   }
   hit.sort((a, b) => (a.tier ? a.tier.level : 99) - (b.tier ? b.tier.level : 99));
@@ -689,7 +693,7 @@ fetch('bey/data.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
   for (const [c, p] of Object.entries(d.products)) {
     const bl = (p.blades || []).map(i => byId[i]).filter(Boolean);
     const chip = bl.find(isChip), main = bl.find(b => b.part === '主刃' || b.part === '金屬戰刃');
-    if (chip && main && !p.random && !/-00$/.test(c)) CX.push({ name: p.special ? p.name : chip.zh + main.zh, code: c, main: main.id, chip: chip.id });
+    if (chip && main && !p.random && !p.set && !/-00$/.test(c)) CX.push({ name: p.special ? p.name : chip.zh + main.zh, code: c, main: main.id, chip: chip.id });
     for (const v of p.variants || []) {
       const vb = byId[v.blade];
       if (vb && (vb.part === '主刃' || vb.part === '金屬戰刃')) {
