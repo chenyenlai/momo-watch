@@ -540,9 +540,11 @@ function render() {
         if (P.en) x += `<br>${esc(P.en)}`;
         x += `<br>內含：${r.blades.map(b => esc(b.zh) + (b.tier ? ' ' + esc(b.tier.label) : isChip(b) ? '（紋章）' : '')).join('、')}</div>`;
         if (P.config) x += `<dl class="rows"><dt>原裝配置</dt><dd>${esc(P.config)} ${cfgMarks(P.config)}</dd>${cfgRows(P.config)}</dl>`;
-        if (v && r.blades.length > 1) x += `<div class="verdict ${v.cls}">${esc(v.title)}<small>${esc(best.zh)}：${esc(v.why)}</small></div>`;
+        if (v && r.blades.length > 1 && !/-00$/.test(r.code)) x += `<div class="verdict ${v.cls}">${esc(v.title)}<small>${esc(best.zh)}：${esc(v.why)}</small></div>`;
       }
-      x += `<div class="actions"><button class="btn" data-buy="${esc(key)}">＋我買了這個商品</button>`;
+      const multi = /-00$/.test(r.code);   // XX-00 是各種限定款的總稱，不是一盒商品
+      if (multi) x += `<p class="meta">${esc(r.code)} 是各種限定款、特別版的總稱，不是同一盒。請在下面找你買的那顆，按它的「＋我買了」。</p>`;
+      x += `<div class="actions">` + (multi ? '' : `<button class="btn" data-buy="${esc(key)}">＋我買了這個商品</button>`);
       if (P.url) x += `<span class="links"><a href="${esc(P.url)}" target="_blank" rel="noopener">BeybladeHub</a></span>`;
       x += `</div>`;
       if (openForm === key) x += recForm(key, recTargets[key]);
@@ -669,12 +671,13 @@ document.addEventListener('submit', (e) => {
 fetch('bey/data.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
   D = d; byId = Object.fromEntries(d.blades.map(b => [b.id, b]));
   // CX 組合名清單：同型號的紋章＋主刃、商品裡的紋章＋主刃，加上抽抽包每款的名字
-  for (const m of d.blades) if ((m.part === '主刃' || m.part === '金屬戰刃') && m.code)
+  // XX-00 是各種限定款的總稱，紋章跟主刃不一定是同一顆，不配對
+  for (const m of d.blades) if ((m.part === '主刃' || m.part === '金屬戰刃') && m.code && !/-00$/.test(m.code))
     for (const c of d.blades) if (isChip(c) && c.code === m.code) CX.push({ name: c.zh + m.zh, code: m.code, main: m.id, chip: c.id });
   for (const [c, p] of Object.entries(d.products)) {
     const bl = (p.blades || []).map(i => byId[i]).filter(Boolean);
     const chip = bl.find(isChip), main = bl.find(b => b.part === '主刃' || b.part === '金屬戰刃');
-    if (chip && main && !p.random) CX.push({ name: chip.zh + main.zh, code: c, main: main.id, chip: chip.id });
+    if (chip && main && !p.random && !/-00$/.test(c)) CX.push({ name: chip.zh + main.zh, code: c, main: main.id, chip: chip.id });
     for (const v of p.variants || []) {
       const vb = byId[v.blade];
       if (vb && (vb.part === '主刃' || vb.part === '金屬戰刃')) {
