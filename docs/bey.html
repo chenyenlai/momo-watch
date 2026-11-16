@@ -170,6 +170,7 @@ function recParts(r) {
   if (/（還沒拆）$/.test(r.name || '')) return [];
   const one = (r.name || '').match(PART_REC);
   if (one) return one[1] === '固鎖' ? [[one[2], '']] : [['', one[2]]];
+  if (/-00$/.test(r.code || '')) return [];   // 限定款總稱：附哪個固鎖、軸心看不出來，零件請另外記
   const got = (r.name || '').match(/：抽到 \S+ (.+)$/);
   let combos;
   if (got) combos = [splitCfg(got[1])];
