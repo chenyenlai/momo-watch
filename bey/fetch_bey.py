@@ -39,6 +39,7 @@ BW_SITEMAP = BW + '/sitemaps/blades.xml'
 BW_PARTS = BW + '/sitemaps/parts.xml'
 SHEET = 'https://docs.google.com/spreadsheets/d/1TBHOpcsv25bBfWERq14CBIy4P1G7j-qpPhmclx_nTWI/gviz/tq?tqx=out:csv'
 COMBO_SHEET = 'https://docs.google.com/spreadsheets/d/18eTJLjyNmqDz5MH0-VD03TX4wobUCdHdrRMyo4uojDo/gviz/tq?tqx=out:csv&sheet=Combo%20Summary'
+PARTS_SHEET = SHEET + '&sheet=%E9%9B%B6%E4%BB%B6%E5%9C%96%E9%91%91'   # 零件圖鑑：固鎖、軸心的圖
 SHEET_PAGE = 'https://stan-yao.github.io/beyblade_x_tier/'
 TW = timezone(timedelta(hours=8))
 CACHE = None
@@ -352,8 +353,37 @@ def add_sheet(data):
     data['cxImg'] = {n: u for n, u in names.items() if n not in by_zh}
     data['sheet'] = {'url': SHEET_PAGE, 'n': len(rows)}
     add_combos(data, bits)
+    add_part_imgs(data)
     print('stan-yao 試算表 %d 列：原裝配置 %d 個型號，別名 %d 顆，圖片 %d 顆' % (
         len(rows), len(orig), sum(1 for b in blades if b.get('alias')), len(best)))
+
+
+def add_part_imgs(data):
+    """零件圖鑑：固鎖、軸心的圖。代號不分大小寫（Nr＝NR），對不到再用全名（Low Cyclone＝LC）"""
+    import csv, io
+    try:
+        rows = list(csv.reader(io.StringIO(get(PARTS_SHEET))))[1:]
+    except Exception as e:
+        print('零件圖鑑抓不到', type(e).__name__, file=sys.stderr)
+        return
+    n = 0
+    for kind in ('ratchet', 'bit'):
+        img = {x[0].strip().lower(): x[2].strip() for x in rows
+               if len(x) > 2 and x[1].strip() == kind and x[2].strip().startswith('https://')}
+        if len(img) < 20:
+            print('零件圖鑑 %s 只有 %d 張，格式可能變了，先不用' % (kind, len(img)), file=sys.stderr)
+            continue
+        abbr = {d.get('name', k).lower(): k.lower() for k, d in data['parts'][kind].items()}   # 全名 → 代號
+        for k, d in data['parts'][kind].items():
+            d.pop('img', None)
+            u = img.get(k.lower()) or img.get(abbr.get(k.lower(), ''))
+            if not u:   # 「Low Cyclone」這種用全名當 key 的：找同全名的代號
+                u = next((img[a.lower()] for a, e in data['parts'][kind].items()
+                          if a.lower() in img and e.get('name', '').lower() == k.lower()), None)
+            if u:
+                d['img'] = u
+                n += 1
+    print('零件圖鑑：%d 個零件有圖' % n)
 
 
 def add_combos(data, bits):

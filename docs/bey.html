@@ -103,7 +103,10 @@ form.rec .actions { grid-column: 1 / -1; margin-top: 0; }
 .pic:empty::after { content: '🌀'; display: grid; place-items: center; height: 100%; font-size: 22px; opacity: .35; }
 .pic img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .pic img.crest { position: absolute; right: -4px; bottom: -4px; width: 24px; height: 24px; border-radius: 50%; background: var(--card); padding: 1px; }
-.bey .pic.big { width: 76px; height: 76px; flex-shrink: 0; }
+.bey .pic.big, .part .pic.big { width: 76px; height: 76px; flex-shrink: 0; }
+.part .top { display: flex; gap: 12px; align-items: center; }
+.chip .pi { width: 22px; height: 22px; object-fit: contain; vertical-align: middle; margin: -4px 2px -4px -4px; }
+.chip .pi + .pi { margin-left: -2px; }
 .all .nm { font-weight: 600; }
 .all .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
 .all .own { color: var(--ok); font-weight: 700; font-size: 13px; }
@@ -330,14 +333,15 @@ function beyCard(b, rec) {
   if (t && t.parts && t.parts.length) {
     const mp = myParts(), have = (k) => mp.has('ratchet|' + k) || mp.has('bit|' + k);
     const n = t.parts.filter(have).length;
-    x += `<dt>推薦搭配</dt><dd>${t.parts.map(k => have(k) ? '<b>✓' + esc(k) + '</b>' : esc(k)).join('、')}` +
-      (S.recs.length ? `<br><small>${n ? '✓ 是你已經有的（' + n + ' 個）' : '這些你都還沒有'}</small>` : '') + `</dd>`;
+    x += `<dt>推薦搭配</dt><dd><div class="chips">${t.parts.map(k =>
+      `<button class="chip${have(k) ? ' on' : ''}" data-q="${esc(k)}">${pimg(k)}${have(k) ? '✓' : ''}${esc(k)}</button>`).join('')}</div>` +
+      (S.recs.length ? `<small>${n ? '✓ 是你已經有的（' + n + ' 個）' : '這些你都還沒有'}</small>` : '') + `</dd>`;
   }
   if (b.combos && b.combos.length) {
     const mp = myParts();
     x += `<dt>比賽常勝</dt><dd><ol class="combos">${b.combos.slice(0, 3).map(([rr, bb, w, f, cr]) => {
       const has = (!rr || mp.has('ratchet|' + rr)) && mp.has('bit|' + bb);
-      return `<li><button class="chip${has ? ' on' : ''}" data-q="${esc(rr || bb)}">${has ? '✓' : ''}${esc((rr || '') + bb)}</button>` +
+      return `<li><button class="chip${has ? ' on' : ''}" data-q="${esc(rr || bb)}">${pimg(rr)}${pimg(bb)}${has ? '✓' : ''}${esc((rr || '') + bb)}</button>` +
         `<small>得獎 ${w} 次${w >= 10 ? '・冠軍率 ' + cr + '%' : f ? '・冠軍 ' + f + ' 次' : ''}</small></li>`;
     }).join('')}</ol>${S.recs.length && b.combos.slice(0, 3).some(([rr, bb]) => (!rr || mp.has('ratchet|' + rr)) && mp.has('bit|' + bb))
       ? '<small>✓ 綠色是你手上零件就能組的</small>' : ''}</dd>`;
@@ -371,9 +375,16 @@ function recForm(key, rec) {
   </form>`;
 }
 
+// 零件小圖（固鎖、軸心），圖來自 stan-yao 零件圖鑑
+function pimg(k) {
+  const d = k && ((D.parts.ratchet || {})[k] || (D.parts.bit || {})[k]);
+  return d && d.img ? `<img class="pi" src="${esc(d.img)}" alt="" loading="lazy">` : '';
+}
 function partCard(kind, key) {
   const d = D.parts[kind][key], p = partNote(kind, key), own = ownPart(kind, key);
-  let x = `<article class="card"><h2>${kind === 'ratchet' ? '固鎖' : '軸心'}</h2><div class="prod"><b>${esc(p.label)}</b></div><dl class="rows">`;
+  let x = `<article class="card part"><h2>${kind === 'ratchet' ? '固鎖' : '軸心'}</h2><div class="top">` +
+    (d.img ? `<span class="pic big"><img src="${esc(d.img)}" alt="" loading="lazy"></span>` : '') +
+    `<div class="prod"><b>${esc(p.label)}</b></div></div><dl class="rows">`;
   const info = [];
   if (d.tier) info.push('T 表 ' + d.tier.label);
   if (d.usage != null) info.push((p.hot ? '🔥 熱門，' : '') + '國外比賽 ' + d.usage + '% 組合在用');
