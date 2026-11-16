@@ -20,6 +20,7 @@ import html
 import json
 import os
 import re
+import unicodedata
 import sys
 import time
 import urllib.request
@@ -291,6 +292,7 @@ def add_sheet(data):
     if len(rows) < 100:
         print('stan-yao 試算表只有 %d 列，格式可能變了，先不用' % len(rows), file=sys.stderr)
         return
+    add_specials(data, rows)
     bits = {k.lower(): k for k in data['parts']['bit']}
     orig = {}
     for x in rows:
@@ -366,11 +368,43 @@ def add_sheet(data):
             b['img'] = best[b['id']][1] if b['id'] in best else alt
     # CX 組合名（蒼龍勇氣）的整顆圖，網頁的列表用
     data['cxImg'] = {n: u for n, u in names.items() if n not in by_zh}
+    data['cxImg'].update({p['name']: p['img'] for p in data['products'].values() if p.get('special') and p.get('img')})
     data['sheet'] = {'url': SHEET_PAGE, 'n': len(rows)}
     add_combos(data, bits)
     add_part_imgs(data)
     print('stan-yao 試算表 %d 列：原裝配置 %d 個型號，別名 %d 顆，圖片 %d 顆' % (
         len(rows), len(orig), sum(1 for b in blades if b.get('alias')), len(best)))
+
+
+def add_specials(data, rows):
+    """BeybladeHub 收在 CX-00 底下的限定 CX（福音戰士 BXG-57-01 等）：試算表有各自的型號和配置，做成可以記錄的商品"""
+    flat = lambda t: unicodedata.normalize('NFKC', t).replace(' ', '').replace('EVA', '')
+    chips = [b for b in data['blades'] if b.get('part') == '鎖定紋章' and (b.get('code') or '').endswith('-00')]
+    mains = sorted([b for b in data['blades'] if b.get('part') in ('主刃', '金屬戰刃')], key=lambda b: -len(b['zh']))
+    assists = {b['zh']: b for b in data['blades'] if b.get('part') == '輔助戰刃'}
+    used = {c['zh'] + m['zh'] for c in data['blades'] if c.get('part') == '鎖定紋章'
+            for m in mains if c.get('code') and c['code'] == m.get('code')}   # 一般 CX 的組合名，限定版不要撞名
+    for x in rows:
+        code, name = x[0].strip(), x[1].strip()
+        if code in data['products'] and not data['products'][code].get('special'):
+            continue
+        chip = next((c for c in chips if flat(c['zh']) and flat(c['zh']) in flat(name)), None)
+        main = next((m for m in mains if m['zh'] in name), None)
+        if not (chip and main):
+            continue
+        asst = assists.get(x[10].strip())
+        nm = chip['zh'] + main['zh']
+        if nm in used:   # 蒼龍勇氣 金屬塗層:闇黑 這種：用試算表的全名
+            nm = name
+        used.add(nm)
+        data['products'][code] = {
+            'name': nm, 'en': name if name != nm else '', 'maker': 'Takara Tomy', 'line': 'CX 限定', 'kind': '限定款', 'price': None, 'release': '',
+            'config': (asst['zh'] if asst else '') + x[6].strip() + x[8].strip(),
+            'blades': [chip['id'], main['id']] + ([asst['id']] if asst else []),
+            'random': False, 'variants': [], 'url': SHEET_PAGE, 'special': True, 'sheetName': name,
+        }
+        if x[12].strip().startswith('https://'):
+            data['products'][code]['img'] = x[12].strip()
 
 
 def add_part_imgs(data):
