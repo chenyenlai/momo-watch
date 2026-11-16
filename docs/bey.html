@@ -165,8 +165,11 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e
 const owned = (id) => S.recs.filter(r => (r.blades || []).includes(id));
 
 // 每筆紀錄裡的固鎖、軸心：抽抽包看抽到的那款，其他看原裝配置（stan-yao 試算表 → BeybladeHub 商品頁）
+const PART_REC = /^單買(固鎖|軸心) (\S+)$/;   // 單獨買的零件（跟人買、拆組）
 function recParts(r) {
   if (/（還沒拆）$/.test(r.name || '')) return [];
+  const one = (r.name || '').match(PART_REC);
+  if (one) return one[1] === '固鎖' ? [[one[2], '']] : [['', one[2]]];
   const got = (r.name || '').match(/：抽到 \S+ (.+)$/);
   let combos;
   if (got) combos = [splitCfg(got[1])];
@@ -386,7 +389,7 @@ function pimg(k) {
   const d = k && ((D.parts.ratchet || {})[k] || (D.parts.bit || {})[k]);
   return d && d.img ? `<img class="pi" src="${esc(d.img)}" alt="" loading="lazy">` : '';
 }
-function partCard(kind, key) {
+function partCard(kind, key, rk) {
   const d = D.parts[kind][key], p = partNote(kind, key), own = ownPart(kind, key);
   let x = `<article class="card part"><h2>${kind === 'ratchet' ? '固鎖' : '軸心'}</h2><div class="top">` +
     (d.img ? `<span class="pic big"><img src="${esc(d.img)}" alt="" loading="lazy"></span>` : '') +
@@ -399,7 +402,9 @@ function partCard(kind, key) {
   const ins = (d.in || []).filter(c => D.products[c]);
   if (ins.length) x += `<dt>哪裡有</dt><dd>${p.gem ? '💎 少見，' : ''}${ins.length} 個商品：${ins.slice(0, 12).map(c =>
     `<button class="chip" data-q="${esc(c)}">${esc(c)} ${esc(D.products[c].name)}</button>`).join(' ')}${ins.length > 12 ? '…' : ''}</dd>`;
-  return x + `</dl></article>`;
+  x += `</dl><div class="actions"><button class="btn ghost" data-buy="${esc(rk)}">＋我單獨買了這個${kind === 'ratchet' ? '固鎖' : '軸心'}</button></div>`;
+  if (openForm === rk) x += recForm(rk, recTargets[rk]);
+  return x + `</article>`;
 }
 
 // ---------- 全部陀螺表 ----------
@@ -547,7 +552,11 @@ function render() {
   } else if (!r.blades.length && !(r.parts || []).length) {
     x += `<p class="empty">找不到「${esc($('#q').value.trim())}」</p>`;
   }
-  for (const [kind, key] of (r && r.parts) || []) x += partCard(kind, key);
+  for (const [kind, key] of (r && r.parts) || []) {
+    const k = 'part:' + kind + ':' + key;
+    recTargets[k] = { code: '', name: '單買' + (kind === 'ratchet' ? '固鎖' : '軸心') + ' ' + key, blades: [], key: k };
+    x += partCard(kind, key, k);
+  }
   for (const b of (r ? r.blades : [])) {
     const key = 'b:' + b.id;
     recTargets[key] = { code: (r.code && b.code !== r.code) ? r.code : b.code, name: b.zh, blades: [b.id], key };
@@ -576,7 +585,7 @@ function renderMine() {
   for (const r of recs) {
     const extra = [fmtDate(r.t), r.price != null ? '$' + r.price : '', r.note].filter(Boolean).join('・');
     const ps = D ? recParts(r) : [];
-    const pt = /：抽到 /.test(r.name) ? '' : ps.map(([rr, bb]) => (rr || '') + (bb || '')).join('、');
+    const pt = /：抽到 /.test(r.name) || PART_REC.test(r.name) ? '' : ps.map(([rr, bb]) => (rr || '') + (bb || '')).join('、');
     x += `<div class="mine"><div class="what">${esc((r.code ? r.code + ' ' : '') + r.name)}${pt ? ' <span class="parts">' + esc(pt) + '</span>' : ''}</div>`;
     x += `<div class="when">${esc(extra)}</div><button data-del="${esc(r.id)}" aria-label="刪除">刪除</button></div>`;
   }
