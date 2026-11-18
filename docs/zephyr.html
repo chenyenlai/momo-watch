@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zephyr RTOS 入門</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 版面跟 Wi-Fi 技術入門一樣：單欄閱讀，每個主題一張「儀器面板」（動畫 + 控制），文字在面板上下 */
+:root{
+  --bg:#F5F7FB; --panel:#FFFFFF; --fg:#14213A; --muted:#5A6A84; --line:#D6DDE9;
+  --accent:#1F5FD6; --bad:#D23F4B;
+  --b24:#D9822B; --b5:#0F9D8A; --b6:#7A4FD0; --u4:#D6457E;
+  --display:"Space Grotesk","Noto Sans TC",system-ui,sans-serif;
+  --body:"Inter","Noto Sans TC",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1524; --panel:#172136; --fg:#E6ECF7; --muted:#95A3BC; --line:#2B3854;
+    --accent:#6EA2FF; --bad:#FF6B76;
+    --b24:#F0A95A; --b5:#3CCBB6; --b6:#A98BF2; --u4:#F07CA8; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1524; --panel:#172136; --fg:#E6ECF7; --muted:#95A3BC; --line:#2B3854;
+  --accent:#6EA2FF; --bad:#FF6B76;
+  --b24:#F0A95A; --b5:#3CCBB6; --b6:#A98BF2; --u4:#F07CA8; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.75;
+  padding-block:28px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+header h1{font-family:var(--display);font-size:clamp(30px,6vw,44px);line-height:1.15;margin:0 0 10px;text-wrap:balance}
+header p{margin:0 0 8px;color:var(--muted);max-width:60ch}
+nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+nav a{font-family:var(--mono);font-size:13px;color:var(--fg);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--panel)}
+nav a:hover,nav a:focus-visible{border-color:var(--accent);color:var(--accent)}
+section{display:flex;flex-direction:column;gap:16px;scroll-margin-top:16px}
+h2{font-family:var(--display);font-size:26px;line-height:1.25;margin:0;text-wrap:balance}
+h2 small{display:block;font-family:var(--mono);font-size:12px;font-weight:400;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+h3{font-size:16px;margin:0}
+p{margin:0;max-width:65ch}
+a{color:var(--accent)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+canvas{display:block;width:100%;height:230px;cursor:pointer}
+body.paused canvas{opacity:.85}
+.cap{font-size:13px;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.row{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-size:14px;font-family:var(--mono);background:transparent;color:var(--fg);border:0;border-right:1px solid var(--line);padding:6px 12px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+label.ctl{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted);flex:1 1 150px;min-width:0}
+label.ctl b{color:var(--fg);font-family:var(--mono);font-weight:600}
+label.chk{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;list-style:none;padding:0;margin:0}
+.legend li{display:flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:3px;flex:none}
+.step{display:flex;flex-direction:column;gap:12px}
+h3.sub{font-family:var(--display);font-size:20px;line-height:1.3;display:flex;align-items:center;gap:10px;text-wrap:balance}
+h3.sub span{flex:none;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--panel);font-size:15px;display:grid;place-items:center}
+details.adv{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+details.adv>summary{cursor:pointer;font-weight:600;color:var(--accent)}
+details.adv[open]>summary{margin-bottom:6px}
+ul.pts,ol.pts{margin:0;padding-left:1.3em;max-width:65ch;display:flex;flex-direction:column;gap:4px}
+pre.code{margin:0;font-family:var(--mono);font-size:13px;line-height:1.6;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;tab-size:4}
+pre.code .c{color:var(--muted)}
+pre.code .k{color:var(--accent)}
+pre.code .h{background:color-mix(in srgb,var(--b24) 22%,transparent);border-radius:3px}
+.file{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:-8px;overflow-wrap:anywhere}
+code{font-family:var(--mono);font-size:.9em;background:color-mix(in srgb,var(--line) 55%,transparent);border-radius:4px;padding:0 4px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.facts div{border-left:3px solid var(--line);padding-left:10px;font-size:13px;color:var(--muted)}
+.facts b{display:block;font-family:var(--mono);font-size:20px;color:var(--fg);font-variant-numeric:tabular-nums}
+.ok{color:var(--b5)} .no{color:var(--bad)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:12px;white-space:nowrap}
+td.n{white-space:nowrap;font-weight:600}
+td code{white-space:nowrap}
+.feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.feat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.feat p{font-size:14px;line-height:1.65}
+.feat p.why{color:var(--muted)}
+.feat h3{font-family:var(--display);font-size:17px}
+/* 程式大小 */
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px 18px}
+.opts label{display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer}
+.opts label input{margin-top:5px;flex:none}
+.opts small{display:block;color:var(--muted);font-size:12px;font-family:var(--mono)}
+.meter{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.meter .mh{display:flex;justify-content:space-between;gap:8px;color:var(--muted)}
+.meter .mh b{font-family:var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
+.meter .track{height:16px;border-radius:6px;background:var(--bg);border:1px solid var(--line);display:flex;overflow:hidden}
+.meter .track i{display:block;height:100%;transition:width .3s}
+.meter.over .mh b{color:var(--bad)}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
+.steps>li{display:flex;flex-direction:column;gap:8px}
+.steps>li>p{font-weight:600}
+.anim{position:fixed;z-index:20;right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 4px 18px rgba(0,0,0,.15)}
+.anim #playBtn{font:inherit;font-size:14px;font-weight:600;min-width:84px;background:var(--accent);color:var(--panel);border:0;border-radius:8px;padding:7px 12px;cursor:pointer}
+.anim .seg button{padding:6px 10px}
+ul.vids{margin:0;padding-left:1.3em;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 20px}
+dl.gloss{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px 24px}
+dl.gloss div{min-width:0}
+dl.gloss dt{font-weight:600}
+dl.gloss dd{margin:0;font-size:14px;color:var(--muted);line-height:1.6}
+footer{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Zephyr RTOS 入門</h1>
+  <p>手錶、手環、藍牙耳機裡面通常不是跑 Linux，而是一顆很小的微控制器，上面跑一個「即時作業系統」（RTOS）。Zephyr 是其中最完整的一個開源 RTOS。這頁從「為什麼需要 RTOS」講起，再介紹執行緒、排程、中斷、同步、Devicetree、藍牙省電，最後教你怎麼寫第一個程式，每個主題都有可以動手玩的動畫。</p>
+  <p>右下角可以暫停動畫、調整速度，點一下動畫也可以暫停。遇到不懂的詞，可以查最後的<a href="#glossary">名詞小辭典</a>。</p>
+  <nav aria-label="章節">
+    <a href="#basics">基礎觀念</a><a href="#sched">執行緒與排程</a><a href="#isr">中斷</a><a href="#sync">同步與優先權反轉</a><a href="#msgq">訊息佇列</a><a href="#power">計時與省電</a><a href="#dt">Devicetree</a><a href="#kconfig">Kconfig</a><a href="#ble">藍牙</a><a href="#start">動手做</a><a href="#vs">和 FreeRTOS 比較</a><a href="#glossary">名詞小辭典</a>
+  </nav>
+</header>
+
+<section id="basics">
+  <h2><small>Basics</small>基礎觀念：微控制器與 RTOS</h2>
+
+  <div class="step">
+    <h3 class="sub"><span>1</span>微控制器：一顆晶片就是一台小電腦</h3>
+    <p>電腦和手機用的是「處理器」，記憶體、儲存空間都是另外的晶片，跑 Windows、Linux、Android 這種大型作業系統。手錶、遙控器、家電裡用的是<b>微控制器</b>（MCU）：處理器、記憶體、快閃記憶體、計時器、各種接腳全部做在同一顆晶片裡，便宜又省電。</p>
+    <div class="facts">
+      <div><b>64 MHz</b>常見藍牙晶片的時脈（手機約 3000 MHz）</div>
+      <div><b>256 KB</b>RAM（手機約 8 GB，差 3 萬倍）</div>
+      <div><b>1 MB</b>放程式的快閃記憶體</div>
+      <div><b>幾 µA</b>睡眠時的電流，一顆鈕扣電池能撐幾個月</div>
+    </div>
+    <div class="cap">數字以 Nordic nRF52840 為例。資源這麼少，Linux 根本放不進去，所以需要一個非常小的作業系統。</div>
+  </div>
+
+  <div class="step">
+    <h3 class="sub"><span>2</span>沒有作業系統：一個大迴圈</h3>
+    <p>最簡單的寫法是不用作業系統，<code>main()</code> 裡面寫一個永遠不會結束的迴圈，依序做每一件事：讀感測器、畫畫面、處理藍牙、檢查按鈕，做完再從頭來。這叫<b>超級迴圈</b>（super loop）。</p>
+    <p>問題是：每件事都要排隊。如果畫畫面要花 10 ms，你剛好在畫畫面的時候按下按鈕，就要等畫完、等藍牙處理完，才輪到「檢查按鈕」。事情越多，反應越慢。</p>
+  </div>
+
+  <div class="step">
+    <h3 class="sub"><span>3</span>RTOS：重要的事先做</h3>
+    <p><b>RTOS</b>（即時作業系統）把程式拆成好幾個獨立的<b>執行緒</b>，每個有自己的優先權。按鈕一按下，硬體發出<b>中斷</b>，RTOS 馬上暫停正在畫畫面的執行緒，先處理按鈕，處理完再回去接著畫。</p>
+    <p>「即時」不是指「很快」，而是指「<b>可以保證多久之內一定會處理</b>」。對手錶來說，這代表按鈕一定很快有反應、心率資料一定不會漏掉。</p>
+    <div class="panel">
+      <div class="row">
+        <span class="cap">畫一次畫面要多久</span>
+        <div class="seg" id="lpSeg" role="group" aria-label="畫一次畫面要多久">
+          <button data-d="2" aria-pressed="false">2 ms</button><button data-d="5" aria-pressed="true">5 ms</button><button data-d="10" aria-pressed="false">10 ms</button>
+        </div>
+      </div>
+      <canvas id="cvLoop" style="height:215px" aria-label="上面是超級迴圈依序做每件事，下面是 RTOS；三角形是按下按鈕的時間，下面的線是等了多久才處理"></canvas>
+      <ul class="legend">
+        <li><span class="sw" style="background:var(--b5)"></span>讀感測器</li>
+        <li><span class="sw" style="background:var(--b6)"></span>畫畫面</li>
+        <li><span class="sw" style="background:var(--b24)"></span>處理藍牙</li>
+        <li><span class="sw" style="background:var(--u4)"></span>處理按鈕</li>
+      </ul>
+      <div class="cap" id="lpOut"></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <h3 class="sub"><span>4</span>Zephyr 是什麼</h3>
+    <p><b>Zephyr</b> 是 Linux 基金會管理的開源 RTOS（Apache 2.0 授權），Intel、Nordic、NXP、Google 等公司一起開發。它不只是一個排程核心，還內建了藍牙、網路、USB、檔案系統、感測器、顯示器等驅動和協定，支援幾百種開發板，從 ARM Cortex-M、RISC-V 到 ESP32 都可以跑。</p>
+    <p>它的設計很多地方學 Linux：用 <a href="#dt">Devicetree</a> 描述硬體、用 <a href="#kconfig">Kconfig</a> 選功能、用 CMake 編譯。一開始比較難上手，但同一份程式比較容易換到別的板子上。</p>
+    <ul class="pts">
+      <li><b>Nordic nRF Connect SDK</b>：Nordic 官方的藍牙開發套件，就是建立在 Zephyr 上。</li>
+      <li><b>ZSWatch</b>：一支開源的 Zephyr 智慧手錶，用 nRF5340。</li>
+      <li><b>Google Chromebook</b> 的嵌入式控制器（EC）韌體也改用 Zephyr。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="sched">
+  <h2><small>Threads &amp; scheduling</small>執行緒與排程</h2>
+  <p>每個<b>執行緒</b>（thread）就像一個獨立的小 <code>main()</code>，有自己的程式和自己的堆疊（stack）。CPU 一次只能跑一個，<b>排程器</b>（scheduler）負責決定現在輪到誰。</p>
+  <p>Zephyr 的規則很簡單：<b>永遠跑「已就緒」裡面優先權最高的那一個</b>。要注意，Zephyr 的優先權是<b>數字越小越優先</b>（FreeRTOS 剛好相反）。執行緒在等東西的時候（例如 <code>k_msleep()</code> 睡覺、等按鈕訊號），就不算就緒，讓給別人跑。</p>
+  <ul class="pts">
+    <li><b>搶占式</b>（priority ≥ 0）：比較優先的執行緒一就緒，馬上搶走 CPU。</li>
+    <li><b>協作式</b>（priority &lt; 0）：一旦開始跑，就不會被其他執行緒搶走，直到它自己讓出來（睡覺、等待或 <code>k_yield()</code>）。適合一段不想被打斷的工作。</li>
+    <li><b>時間切片</b>（<code>CONFIG_TIMESLICING</code>）：同樣優先權的執行緒，每跑一小段時間就換下一個，不會有人一直霸佔。</li>
+  </ul>
+  <div class="panel">
+    <div class="seg" id="schSeg" role="group" aria-label="排程方式">
+      <button data-m="pre" aria-pressed="true">搶占式</button><button data-m="slice" aria-pressed="false">搶占式 + 時間切片</button><button data-m="coop" aria-pressed="false">全部協作式</button>
+    </div>
+    <canvas id="cvSch" style="height:270px" aria-label="四個執行緒各一排時間軸，顯示誰在跑、誰在等"></canvas>
+    <ul class="legend">
+      <li><span class="sw" style="background:var(--muted)"></span>實心：正在跑</li>
+      <li><span class="sw" style="background:transparent;border-bottom:3px solid var(--line);border-radius:0"></span>細線：已就緒，在等 CPU</li>
+      <li>▼ 有新工作</li>
+    </ul>
+    <div class="cap" id="schOut"></div>
+    <div class="cap">四個執行緒：按鈕（優先權 1）、畫面（5）、上傳和記錄（都是 8）。「上傳」和「記錄」是很長的背景工作。切換上面的按鈕，比較按鈕要等多久才被處理，以及兩個背景工作怎麼分 CPU。</div>
+  </div>
+  <p>在 Zephyr 裡建立一個執行緒，最簡單是用 <code>K_THREAD_DEFINE</code>，開機時就會自動開始跑：</p>
+  <pre class="code"><span class="k">#include</span> &lt;zephyr/kernel.h&gt;
+
+<span class="k">void</span> upload_thread(<span class="k">void</span>)
+{
+    <span class="k">while</span> (1) {
+        send_data_to_phone();      <span class="c">/* 很長的工作 */</span>
+        k_msleep(1000);            <span class="c">/* 睡 1 秒，這段時間把 CPU 讓給別人 */</span>
+    }
+}
+
+<span class="c">/*               名字        堆疊大小  進入點          三個參數          優先權 選項 延遲 */</span>
+K_THREAD_DEFINE(upload_tid, 1024, upload_thread, NULL, NULL, NULL, <span class="h">8</span>,     0,   0);</pre>
+  <details class="adv">
+    <summary>進階：執行緒的四種狀態</summary>
+    <ul class="pts">
+      <li><b>執行中</b>（running）：CPU 正在跑它，同一時間只有一個。</li>
+      <li><b>就緒</b>（ready）：隨時可以跑，只是在排隊等 CPU。</li>
+      <li><b>等待中</b>（pending）：在等某件事，例如睡覺時間到、號誌、佇列有資料。等到之後回到就緒。</li>
+      <li><b>暫停</b>（suspended）：被 <code>k_thread_suspend()</code> 停下來，要 <code>k_thread_resume()</code> 才會回來。</li>
+    </ul>
+    <p>沒有任何執行緒就緒的時候，Zephyr 會跑一個優先權最低的 <b>idle 執行緒</b>，它的工作就是讓 CPU 進入睡眠省電（見<a href="#power">計時與省電</a>）。每個執行緒都有自己的堆疊，堆疊給太小會溢位、當機；開 <code>CONFIG_THREAD_ANALYZER</code> 可以看每個執行緒實際用了多少。</p>
+  </details>
+</section>
+
+<section id="isr">
+  <h2><small>Interrupts</small>中斷：硬體喊「有事！」</h2>
+  <p>按鈕按下、序列埠收到一個字、計時器到點，硬體會送出<b>中斷</b>。CPU 會立刻停下手上的事（不管是哪個執行緒），跳去執行一小段專門的程式，叫<b>中斷服務常式</b>（ISR），做完再回去。中斷比任何執行緒都優先。</p>
+  <p>ISR 的黃金規則：<b>越短越好</b>。ISR 在跑的時候，同等級的其他中斷只能排隊。如果在 ISR 裡做很久的事，其他硬體的資料就可能來不及收而遺失。正確做法是：ISR 只做「記下來、通知別人」，例如 <code>k_sem_give()</code> 給一個號誌，真正的工作交給執行緒去做。</p>
+  <div class="panel">
+    <div class="seg" id="isrSeg" role="group" aria-label="按鈕的處理方式">
+      <button data-m="long" aria-pressed="true">在 ISR 裡全部做完</button><button data-m="short" aria-pressed="false">ISR 只通知，交給執行緒</button>
+    </div>
+    <canvas id="cvIsr" style="height:230px" aria-label="三排時間軸：中斷、按鈕執行緒、其他工作；上方小刻度是序列埠收到的字，紅色叉叉是遺失的字"></canvas>
+    <ul class="legend">
+      <li><span class="sw" style="background:var(--b5)"></span>序列埠 ISR（收一個字）</li>
+      <li><span class="sw" style="background:var(--u4)"></span>按鈕的處理</li>
+      <li><span class="sw" style="background:var(--b24)"></span>其他工作</li>
+      <li><span class="sw" style="background:var(--bad)"></span>✕ 來不及收、遺失</li>
+    </ul>
+    <div class="cap" id="isrOut"></div>
+    <div class="cap">序列埠每 2.5 ms 收到一個字，硬體只能暫存一下下，1.2 ms 內沒有被 ISR 讀走就會被下一個蓋掉。按鈕要做 7 ms 的工作。</div>
+  </div>
+  <pre class="code"><span class="k">static</span> <span class="k">struct</span> gpio_callback btn_cb;
+K_SEM_DEFINE(btn_sem, 0, 1);              <span class="c">/* 號誌：初始 0，最多 1 */</span>
+
+<span class="c">/* ISR：只做通知，馬上結束 */</span>
+<span class="k">static void</span> btn_isr(<span class="k">const struct</span> device *dev, <span class="k">struct</span> gpio_callback *cb, uint32_t pins)
+{
+    k_sem_give(&amp;btn_sem);
+}
+
+<span class="c">/* 執行緒：平常在等號誌，收到才做事 */</span>
+<span class="k">void</span> btn_thread(<span class="k">void</span>)
+{
+    <span class="k">while</span> (1) {
+        k_sem_take(&amp;btn_sem, K_FOREVER);  <span class="c">/* 沒有訊號就一直等，不佔 CPU */</span>
+        handle_button();                  <span class="c">/* 花時間的工作放這裡，可以被中斷打斷 */</span>
+    }
+}
+K_THREAD_DEFINE(btn_tid, 1024, btn_thread, NULL, NULL, NULL, 1, 0, 0);</pre>
+  <details class="adv">
+    <summary>進階：工作佇列（work queue）</summary>
+    <p>如果不想為每件小事都開一個執行緒，可以用 <b>work queue</b>：在 ISR 裡呼叫 <code>k_work_submit(&amp;my_work)</code>，Zephyr 內建的「系統工作佇列」執行緒會幫你把 <code>my_work</code> 的函式跑完。很多驅動都用這招把 ISR 的工作往後延。另外要記得：ISR 裡不能呼叫會「等待」的函式，例如 <code>k_msleep()</code>、<code>k_mutex_lock()</code>；<code>k_sem_take()</code>、<code>k_msgq_put()</code> 要用 <code>K_NO_WAIT</code>。</p>
+  </details>
+</section>
+
+<section id="sync">
+  <h2><small>Semaphore, mutex &amp; priority inversion</small>同步：號誌、互斥鎖與優先權反轉</h2>
+  <p>很多執行緒會共用同一個東西，例如同一條 I²C 匯流排上的感測器。如果兩個執行緒同時去讀，資料就會亂掉。所以要有一把「鎖」：拿到鎖的人才能用，用完放回去，其他人要排隊。</p>
+  <ul class="pts">
+    <li><b>號誌</b>（<code>k_sem</code>）：一個計數器，<code>give</code> 加一、<code>take</code> 減一，減到 0 就要等。常用來「通知」（上一節的按鈕），ISR 也可以 give。</li>
+    <li><b>互斥鎖</b>（<code>k_mutex</code>）：專門用來「保護共用資源」的鎖，只有拿鎖的人能解鎖，而且有<b>優先權繼承</b>。</li>
+  </ul>
+  <p>為什麼要有優先權繼承？看下面這個有名的問題：低優先權的 L 先拿到鎖；高優先權的 H 也要用，只好等 L。這時中優先權的 M 跑出來，它比 L 優先，就把 L 搶掉一直跑。結果 H 被一個跟鎖完全無關的 M 卡住，這叫<b>優先權反轉</b>。1997 年 NASA 火星探路者號就是因為這個問題一直重開機。</p>
+  <div class="panel">
+    <div class="seg" id="invSeg" role="group" aria-label="鎖的種類">
+      <button data-m="sem" aria-pressed="true">用號誌當鎖（沒有繼承）</button><button data-m="mutex" aria-pressed="false">用 k_mutex（優先權繼承）</button>
+    </div>
+    <canvas id="cvInv" style="height:220px" aria-label="三排時間軸：高、中、低優先權執行緒；紅色區塊是在等鎖"></canvas>
+    <ul class="legend">
+      <li><span class="sw" style="background:var(--muted)"></span>實心：正在跑</li>
+      <li><span class="sw" style="background:var(--muted);box-shadow:inset 0 3px 0 var(--fg)"></span>上緣有粗線：拿著鎖</li>
+      <li><span class="sw" style="background:color-mix(in srgb,var(--bad) 30%,transparent);border:1px dashed var(--bad)"></span>在等鎖</li>
+    </ul>
+    <div class="cap" id="invOut"></div>
+  </div>
+  <pre class="code">K_MUTEX_DEFINE(i2c_lock);
+
+<span class="k">void</span> read_sensor(<span class="k">void</span>)
+{
+    k_mutex_lock(&amp;i2c_lock, K_FOREVER);
+    i2c_read(...);                 <span class="c">/* 這段同時只有一個執行緒能進來 */</span>
+    k_mutex_unlock(&amp;i2c_lock);
+}</pre>
+</section>
+
+<section id="msgq">
+  <h2><small>Message queue</small>訊息佇列：把資料從一邊交給另一邊</h2>
+  <p>心率感測器每 100 ms 產生一筆資料，藍牙執行緒負責把它送到手機。兩邊的速度不一定一樣：藍牙偶爾會忙一下（例如在重新連線）。中間放一個<b>訊息佇列</b>（<code>k_msgq</code>），就像一條輸送帶，生產的一端放進去，消費的一端拿出來，暫時處理不完的先排在上面。</p>
+  <p>佇列的長度是固定的（開機時就配好記憶體）。佇列滿了，新資料就放不進去，只能丟掉或等待。所以要依照「最壞的時候會卡多久」來決定佇列要多長。</p>
+  <div class="panel">
+    <div class="row">
+      <label class="ctl" for="qCap"><span>佇列長度：<b id="qCapO"></b></span><input type="range" id="qCap" min="1" max="12" value="4"></label>
+      <label class="ctl" for="qProc"><span>藍牙處理一筆要：<b id="qProcO"></b></span><input type="range" id="qProc" min="40" max="140" step="10" value="70"></label>
+      <label class="chk"><input type="checkbox" id="qStall" checked>藍牙每 4 秒忙 0.8 秒</label>
+    </div>
+    <canvas id="cvQ" style="height:250px" aria-label="左邊感測器放資料進佇列，右邊藍牙拿出來處理；下面是佇列長度隨時間的變化，紅點是丟掉的資料"></canvas>
+    <div class="facts" id="qFacts"></div>
+    <div class="cap">感測器每 100 ms 放一筆。藍牙處理一筆的時間超過 100 ms，平均就跟不上，佇列再長都會滿；低於 100 ms 但偶爾會忙，佇列就要夠長，才撐得過忙的那 0.8 秒（大約 8 筆）。</div>
+  </div>
+  <pre class="code"><span class="k">struct</span> hr_sample { uint16_t bpm; uint32_t time; };
+K_MSGQ_DEFINE(hr_q, <span class="k">sizeof</span>(<span class="k">struct</span> hr_sample), <span class="h">8</span>, 4);   <span class="c">/* 最多排 8 筆 */</span>
+
+<span class="c">/* 感測器那邊（ISR 也可以）：不等待，滿了就丟 */</span>
+<span class="k">if</span> (k_msgq_put(&amp;hr_q, &amp;s, K_NO_WAIT) != 0) {
+    dropped++;
+}
+
+<span class="c">/* 藍牙執行緒：沒資料就等 */</span>
+k_msgq_get(&amp;hr_q, &amp;s, K_FOREVER);
+send_over_ble(&amp;s);</pre>
+</section>
+
+<section id="power">
+  <h2><small>Timers, ticks &amp; tickless idle</small>計時與省電：沒事就睡覺</h2>
+  <p>手錶一天大部分時間都在「等」：等下一秒更新時間、等手腕抬起來。CPU 在等的時候，就應該進入睡眠，電流可以從幾 mA 降到幾 µA，差一千倍。</p>
+  <p>傳統的 RTOS 用一個固定的<b>系統 tick</b> 計時：計時器每 10 ms（100 Hz）或 1 ms（1000 Hz）叫醒 CPU 一次，看看有沒有誰的時間到了。就算沒事做，也每秒被叫醒幾百次。Zephyr 預設是 <b>tickless</b>：直接算出「下一件事在什麼時候」，把計時器設到那個時間，中間一覺睡到底。</p>
+  <div class="panel">
+    <div class="row">
+      <span class="cap">傳統 tick 頻率</span>
+      <div class="seg" id="tkSeg" role="group" aria-label="tick 頻率">
+        <button data-r="100" aria-pressed="true">100 Hz</button><button data-r="1000" aria-pressed="false">1000 Hz</button>
+      </div>
+    </div>
+    <canvas id="cvTick" style="height:230px" aria-label="兩條 CPU 電流的波形：上面固定 tick 一直被叫醒，下面 tickless 只在工作時醒來"></canvas>
+    <div class="facts" id="tkFacts"></div>
+    <div class="cap">程式每 500 ms 醒來做 2 ms 的事（<code>k_msleep(500)</code>）。電流是粗估：睡眠 3 µA、醒著 3 mA、每次被 tick 叫醒約 20 µs。圖上把很短的尖峰畫寬了，才看得到。</div>
+  </div>
+  <p>要固定時間做一件事，可以用 <b>k_timer</b>。注意 timer 到點時的函式是在中斷裡跑的，一樣要很短：</p>
+  <pre class="code"><span class="k">void</span> tick_fn(<span class="k">struct</span> k_timer *t) { k_sem_give(&amp;redraw_sem); }   <span class="c">/* 中斷裡：只通知 */</span>
+K_TIMER_DEFINE(clock_timer, tick_fn, NULL);
+
+k_timer_start(&amp;clock_timer, K_SECONDS(1), K_SECONDS(1));   <span class="c">/* 1 秒後開始，之後每 1 秒 */</span></pre>
+  <details class="adv">
+    <summary>進階：電源管理</summary>
+    <p>開啟 <code>CONFIG_PM</code>（系統電源管理）後，idle 執行緒會依照「下一件事還要多久」自動選擇睡多深：只睡一下就淺睡，等很久就深睡（關掉更多時脈）。開啟 <code>CONFIG_PM_DEVICE</code> 後，沒在用的周邊（螢幕、感測器、序列埠）也可以個別關電。很多 Nordic 晶片光靠 tickless 和自動睡眠，閒置時就只剩幾 µA。</p>
+  </details>
+</section>
+
+<section id="dt">
+  <h2><small>Devicetree</small>Devicetree：把「硬體接在哪」寫在程式外面</h2>
+  <p>同樣是「讓 LED 閃」，每塊板子的 LED 接在不同的腳位：nRF52840 DK 接 P0.13、STM32 Nucleo 接 PA5、Raspberry Pi Pico 接 GP25。有的板子 LED 是腳位輸出「高電位」才亮，有的是「低電位」才亮。</p>
+  <p>如果這些寫死在程式裡，換一塊板子就要改程式。Zephyr 的做法是把硬體資訊寫在 <b>Devicetree</b>（<code>.dts</code> 檔）裡，每塊板子一份；程式只說「我要用叫做 <code>led0</code> 的那顆 LED」。編譯的時候選哪塊板子，就套用那塊板子的 Devicetree。</p>
+  <div class="panel">
+    <div class="seg" id="bdSeg" role="group" aria-label="開發板">
+      <button data-b="0" aria-pressed="true">nRF52840 DK</button><button data-b="1" aria-pressed="false">NUCLEO-F401RE</button><button data-b="2" aria-pressed="false">Raspberry Pi Pico</button>
+    </div>
+    <canvas id="cvBoard" style="height:200px" aria-label="開發板示意圖：晶片的一隻腳位接到 LED，顯示腳位電位和 LED 是否亮"></canvas>
+    <div class="file" id="bdFile"></div>
+    <pre class="code" id="bdDts"></pre>
+    <div class="file">src/main.c（三塊板子都一樣，一個字都不用改）</div>
+    <pre class="code"><span class="k">#include</span> &lt;zephyr/kernel.h&gt;
+<span class="k">#include</span> &lt;zephyr/drivers/gpio.h&gt;
+
+<span class="k">static const struct</span> gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(<span class="h">led0</span>), gpios);
+
+<span class="k">int</span> main(<span class="k">void</span>)
+{
+    <span class="k">if</span> (!gpio_is_ready_dt(&amp;led)) {
+        <span class="k">return</span> 0;
+    }
+    gpio_pin_configure_dt(&amp;led, GPIO_OUTPUT_ACTIVE);
+    <span class="k">while</span> (1) {
+        gpio_pin_toggle_dt(&amp;led);    <span class="c">/* 「亮」是高還是低電位，Devicetree 會幫你換算 */</span>
+        k_msleep(1000);
+    }
+    <span class="k">return</span> 0;
+}</pre>
+    <div class="cap" id="bdOut"></div>
+  </div>
+  <p>想把 LED 改接到別的腳位，也不用改板子的檔案，只要在自己的專案放一個 <code>app.overlay</code>，蓋掉想改的部分：</p>
+  <div class="file">app.overlay</div>
+  <pre class="code">&amp;led0 {
+    gpios = &lt;&amp;gpio0 <span class="h">17</span> GPIO_ACTIVE_HIGH&gt;;   <span class="c">/* 改接 P0.17，高電位亮 */</span>
+};</pre>
+</section>
+
+<section id="kconfig">
+  <h2><small>Kconfig</small>Kconfig：要什麼功能就打開什麼</h2>
+  <p>Zephyr 有上千個功能，但微控制器的空間很小，不可能全部放進去。每個功能都是一個 <b>Kconfig</b> 選項，寫在專案的 <code>prj.conf</code> 裡。沒打開的功能完全不會編譯進去，不佔任何空間。</p>
+  <p>下面勾選看看，每打開一個功能，程式大概會變多大。藍牙和圖形介面是最佔空間的。</p>
+  <div class="panel">
+    <div class="row">
+      <span class="cap">晶片</span>
+      <div class="seg" id="kcChip" role="group" aria-label="晶片">
+        <button data-c="0" aria-pressed="true">nRF52832</button><button data-c="1" aria-pressed="false">nRF52840</button><button data-c="2" aria-pressed="false">nRF5340</button>
+      </div>
+    </div>
+    <div class="opts" id="kcOpts"></div>
+    <div class="meter" id="kcFlash"></div>
+    <div class="meter" id="kcRam"></div>
+    <div class="file">prj.conf</div>
+    <pre class="code" id="kcConf"></pre>
+    <div class="cap">數字是大概值，依晶片架構、Zephyr 版本、設定細節會差很多。實際大小可以用 <code>west build -t rom_report</code>、<code>west build -t ram_report</code> 看。</div>
+  </div>
+  <p>不知道有哪些選項，可以打 <code>west build -t menuconfig</code>，會跳出一個可以瀏覽、搜尋、勾選的文字介面。</p>
+</section>
+
+<section id="ble">
+  <h2><small>Bluetooth Low Energy</small>藍牙低功耗：多久醒來一次</h2>
+  <p>手錶用的是<b>藍牙低功耗</b>（BLE）。它省電的秘密是：無線電大部分時間都關著，只在約好的時間點醒來一下下。Zephyr 內建完整的 BLE 協定堆疊，打開 <code>CONFIG_BT=y</code> 就能用。</p>
+  <ul class="pts">
+    <li><b>廣播</b>（advertising）：還沒連線時，每隔一段時間在 37、38、39 三個頻道各喊一次「我在這裡」，讓手機找到。間隔可以設 20 ms 到 10.24 秒。</li>
+    <li><b>連線</b>（connection）：連上之後，雙方約好每隔一個「連線間隔」見一次面交換資料，間隔可以設 7.5 ms 到 4 秒。</li>
+  </ul>
+  <p>間隔越短，反應越快，但越耗電；間隔越長越省電，但手機要等比較久才找到你、資料延遲也比較長。拉拉看：</p>
+  <div class="panel">
+    <div class="row">
+      <div class="seg" id="bleSeg" role="group" aria-label="藍牙狀態">
+        <button data-m="adv" aria-pressed="true">廣播中</button><button data-m="conn" aria-pressed="false">已連線</button>
+      </div>
+      <label class="ctl" for="bleI"><span><span id="bleIL">廣播間隔</span>：<b id="bleIO"></b></span><input type="range" id="bleI" min="0" max="100" value="40"></label>
+    </div>
+    <canvas id="cvBle" style="height:200px" aria-label="最近 4 秒的無線電電流，每根尖峰是一次廣播或連線事件"></canvas>
+    <div class="facts" id="bleFacts"></div>
+    <div class="cap">電流是粗估：閒置 2 µA，一次廣播（三個頻道）約 20 µC、一次沒有資料的連線事件約 6 µC。電池以 CR2032 鈕扣電池 220 mAh 計算，只算藍牙，不算螢幕和感測器。</div>
+  </div>
+  <pre class="code"><span class="c">/* 開始廣播（間隔以 0.625 ms 為單位：160 × 0.625 = 100 ms） */</span>
+<span class="k">static const struct</span> bt_data ad[] = {
+    BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
+    BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, <span class="k">sizeof</span>(CONFIG_BT_DEVICE_NAME) - 1),
+};
+
+bt_enable(NULL);
+bt_le_adv_start(BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONN, 160, 160, NULL), ad, ARRAY_SIZE(ad), NULL, 0);</pre>
+  <details class="adv">
+    <summary>進階：GATT 服務</summary>
+    <p>連上之後，資料用 <b>GATT</b> 交換：手錶提供幾個「服務」（service），每個服務有幾個「特徵值」（characteristic），手機可以讀、寫或訂閱通知。例如標準的心率服務（Heart Rate Service），手機訂閱後，手錶每次量到新的心率就呼叫 <code>bt_gatt_notify()</code> 推過去。Zephyr 的 <code>samples/bluetooth/peripheral_hr</code> 就是一個完整的心率手環範例。</p>
+  </details>
+</section>
+
+<section id="start">
+  <h2><small>Getting started</small>動手做：第一個 Zephyr 程式</h2>
+  <p>Zephyr 用一個叫 <b>west</b> 的命令列工具管理原始碼、編譯、燒錄。下面以 Linux／macOS 為例（Windows 也可以，指令幾乎一樣）。詳細步驟以官方的 Getting Started Guide 為準。</p>
+  <ol class="steps">
+    <li><p>1. 安裝 Python、CMake、Ninja 等工具，然後裝 west</p>
+<pre class="code">python3 -m venv ~/zephyrproject/.venv
+source ~/zephyrproject/.venv/bin/activate
+pip install west</pre></li>
+    <li><p>2. 下載 Zephyr 原始碼和相依套件（會下載好幾 GB，要等一下）</p>
+<pre class="code">west init ~/zephyrproject
+cd ~/zephyrproject
+west update
+west zephyr-export
+west packages pip --install      <span class="c"># 較舊的版本用 pip install -r zephyr/scripts/requirements.txt</span></pre></li>
+    <li><p>3. 安裝 Zephyr SDK（各種晶片的編譯器）</p>
+<pre class="code">cd zephyr
+west sdk install</pre></li>
+    <li><p>4. 編譯範例 blinky，<code>-b</code> 後面是板子的名字</p>
+<pre class="code">west build -p always -b nrf52840dk/nrf52840 samples/basic/blinky</pre></li>
+    <li><p>5. 接上 USB，燒進板子</p>
+<pre class="code">west flash</pre></li>
+  </ol>
+  <div class="panel">
+    <h3>沒有板子也可以玩</h3>
+    <p>Zephyr 有一個特別的板子叫 <code>native_sim</code>，會把整個 Zephyr 編譯成一般的 Linux 程式，直接在電腦上跑，很適合先練習執行緒、號誌這些觀念：</p>
+<pre class="code">west build -p always -b native_sim samples/synchronization
+./build/zephyr/zephyr.exe</pre>
+    <div class="cap">也可以用 <code>qemu_x86</code>、<code>qemu_cortex_m3</code> 搭配 <code>west build -t run</code>，在模擬器裡跑。</div>
+  </div>
+  <p>自己的專案最少只要三個檔案：</p>
+  <pre class="code">my_watch/
+├── CMakeLists.txt     <span class="c"># 告訴 CMake 這是 Zephyr 專案、要編哪些 .c</span>
+├── prj.conf           <span class="c"># Kconfig：要打開哪些功能</span>
+└── src/
+    └── main.c</pre>
+  <div class="file">CMakeLists.txt</div>
+  <pre class="code">cmake_minimum_required(VERSION 3.20.0)
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(my_watch)
+target_sources(app PRIVATE src/main.c)</pre>
+  <div class="feats">
+    <div class="feat"><h3>printk 和 LOG</h3><p>最簡單的除錯是 <code>printk("hr=%d\n", hr);</code>，從序列埠或 RTT 看輸出。正式一點用 <code>LOG_INF()</code>、<code>LOG_ERR()</code>，可以分等級、分模組開關。</p></div>
+    <div class="feat"><h3>Shell</h3><p>打開 <code>CONFIG_SHELL=y</code>，序列埠就有一個命令列，可以打 <code>kernel threads</code> 看每個執行緒的狀態和堆疊用量。</p></div>
+    <div class="feat"><h3>官方範例</h3><p><code>samples/</code> 資料夾有幾百個範例：<code>basic/threads</code>、<code>bluetooth/peripheral_hr</code>、<code>drivers/display</code>、<code>subsys/display/lvgl</code>，從範例改起最快。</p></div>
+    <div class="feat"><h3>找板子名字</h3><p><code>west boards</code> 會列出所有支援的板子。官方文件的 Supported Boards 頁也有每塊板子的接腳和功能。</p></div>
+  </div>
+</section>
+
+<section id="vs">
+  <h2><small>Zephyr vs. FreeRTOS</small>和 FreeRTOS 比較</h2>
+  <p><b>FreeRTOS</b> 是另一個很有名的開源 RTOS，現在由 Amazon 維護（MIT 授權）。它的核心非常小，只負責執行緒（它叫 task）、佇列、號誌、計時器；藍牙、網路、驅動通常用晶片廠商的 SDK 或另外找。觀念和 Zephyr 幾乎一樣，只是名字不同：</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>做什麼</th><th>Zephyr</th><th>FreeRTOS</th></tr></thead>
+      <tbody>
+        <tr><td class="n">建立執行緒</td><td><code>K_THREAD_DEFINE</code>、<code>k_thread_create()</code></td><td><code>xTaskCreate()</code></td></tr>
+        <tr><td class="n">睡一下</td><td><code>k_msleep(100)</code></td><td><code>vTaskDelay(pdMS_TO_TICKS(100))</code></td></tr>
+        <tr><td class="n">號誌</td><td><code>k_sem_give()</code> / <code>k_sem_take()</code></td><td><code>xSemaphoreGive()</code> / <code>xSemaphoreTake()</code></td></tr>
+        <tr><td class="n">互斥鎖</td><td><code>k_mutex_lock()</code></td><td><code>xSemaphoreCreateMutex()</code> + Take</td></tr>
+        <tr><td class="n">訊息佇列</td><td><code>k_msgq_put()</code> / <code>k_msgq_get()</code></td><td><code>xQueueSend()</code> / <code>xQueueReceive()</code></td></tr>
+        <tr><td class="n">軟體計時器</td><td><code>k_timer_start()</code></td><td><code>xTimerCreate()</code> + <code>xTimerStart()</code></td></tr>
+        <tr><td class="n">在 ISR 裡呼叫</td><td>同一個函式，參數用 <code>K_NO_WAIT</code></td><td>要改用 <code>...FromISR()</code> 版本</td></tr>
+        <tr><td class="n">優先權</td><td><b>數字越小越優先</b></td><td><b>數字越大越優先</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th></th><th>Zephyr</th><th>FreeRTOS</th></tr></thead>
+      <tbody>
+        <tr><td class="n">定位</td><td>完整的作業系統：核心 + 驅動 + 協定 + 工具</td><td>精簡的核心，其他自己組</td></tr>
+        <tr><td class="n">內建功能</td><td>藍牙、Wi-Fi、TCP/IP、USB、檔案系統、Shell、LOG、電源管理、韌體更新</td><td>核心本身沒有；FreeRTOS-Plus 另有 TCP、MQTT 等函式庫</td></tr>
+        <tr><td class="n">硬體設定</td><td>Devicetree + Kconfig，換板子不用改程式</td><td><code>FreeRTOSConfig.h</code>，腳位寫在程式或廠商 SDK 裡</td></tr>
+        <tr><td class="n">核心大小</td><td>最小約 8 KB 起</td><td>最小約 5–10 KB</td></tr>
+        <tr><td class="n">學習曲線</td><td>比較陡：要先懂 west、CMake、Devicetree</td><td>平緩：加幾個 .c 檔就能用</td></tr>
+        <tr><td class="n">誰在用</td><td>Nordic nRF Connect SDK、ZSWatch、Chromebook EC</td><td>ESP-IDF（ESP32）、STM32Cube、AWS IoT、PineTime 的 InfiniTime</td></tr>
+        <tr><td class="n">授權</td><td>Apache 2.0</td><td>MIT</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="feats">
+    <div class="feat"><h3>比較適合 Zephyr</h3><p>用 Nordic 晶片做藍牙產品（手錶、手環、感測器）；需要很多協定（藍牙 + USB + 檔案系統）；想要同一份程式跑在不同板子上。</p></div>
+    <div class="feat"><h3>比較適合 FreeRTOS</h3><p>用 ESP32、STM32 而且廠商 SDK 已經包好 FreeRTOS；功能單純、想要越小越好；想先快速學會 RTOS 的基本觀念。</p></div>
+  </div>
+</section>
+
+<section id="videos">
+  <h2><small>More</small>想看影片、想讀更多</h2>
+  <div class="panel">
+    <div class="cap">下面是 YouTube 的搜尋連結和官方文件，可以挑喜歡的看。</div>
+    <ul class="vids">
+      <li><a href="https://www.youtube.com/results?search_query=RTOS+%E6%98%AF%E4%BB%80%E9%BA%BC+%E5%85%A5%E9%96%80" target="_blank" rel="noopener">RTOS 是什麼（中文）</a></li>
+      <li><a href="https://www.youtube.com/results?search_query=Zephyr+RTOS+%E6%95%99%E5%AD%B8" target="_blank" rel="noopener">Zephyr 教學（中文）</a></li>
+      <li><a href="https://www.youtube.com/results?search_query=Introduction+to+Zephyr+RTOS" target="_blank" rel="noopener">英文：Introduction to Zephyr</a></li>
+      <li><a href="https://www.youtube.com/results?search_query=zephyr+devicetree+explained" target="_blank" rel="noopener">英文：Devicetree 圖解</a></li>
+      <li><a href="https://www.youtube.com/results?search_query=priority+inversion+mars+pathfinder" target="_blank" rel="noopener">英文：火星探路者號與優先權反轉</a></li>
+      <li><a href="https://www.youtube.com/results?search_query=ZSWatch+zephyr+smartwatch" target="_blank" rel="noopener">ZSWatch 開源手錶</a></li>
+      <li><a href="https://docs.zephyrproject.org/latest/develop/getting_started/index.html" target="_blank" rel="noopener">官方 Getting Started Guide</a></li>
+      <li><a href="https://academy.nordicsemi.com/" target="_blank" rel="noopener">Nordic DevAcademy（免費課程）</a></li>
+    </ul>
+  </div>
+</section>
+
+<section id="glossary">
+  <h2><small>Glossary</small>名詞小辭典</h2>
+  <div class="panel">
+    <dl class="gloss">
+      <div><dt>微控制器（MCU）</dt><dd>處理器、記憶體、快閃記憶體、周邊都做在同一顆晶片裡的小電腦。</dd></div>
+      <div><dt>RTOS</dt><dd>即時作業系統。重點不是快，而是能保證事情在多久之內一定被處理。</dd></div>
+      <div><dt>超級迴圈</dt><dd>不用作業系統，main 裡一個無限迴圈依序做每件事的寫法。</dd></div>
+      <div><dt>執行緒（thread）</dt><dd>一段獨立執行的程式，有自己的堆疊和優先權。FreeRTOS 叫 task。</dd></div>
+      <div><dt>排程器</dt><dd>決定現在輪到哪個執行緒用 CPU 的那部分作業系統。</dd></div>
+      <div><dt>優先權</dt><dd>執行緒的重要程度。Zephyr 數字越小越優先，負數是協作式。</dd></div>
+      <div><dt>搶占（preemption）</dt><dd>比較優先的執行緒一就緒，就把正在跑的執行緒暫停、搶走 CPU。</dd></div>
+      <div><dt>時間切片</dt><dd>同優先權的執行緒輪流，每人跑一小段時間就換下一個。</dd></div>
+      <div><dt>堆疊（stack）</dt><dd>執行緒放區域變數和函式呼叫資訊的記憶體，每個執行緒各一塊，大小要事先給。</dd></div>
+      <div><dt>中斷（interrupt）</dt><dd>硬體發出的訊號，讓 CPU 立刻停下手上的事去處理它。</dd></div>
+      <div><dt>ISR</dt><dd>中斷服務常式，中斷發生時執行的那段程式，要越短越好。</dd></div>
+      <div><dt>號誌（semaphore）</dt><dd>一個計數器，give 加一、take 減一，到 0 就要等。常用來通知。</dd></div>
+      <div><dt>互斥鎖（mutex）</dt><dd>保護共用資源的鎖，一次只讓一個執行緒進入，有優先權繼承。</dd></div>
+      <div><dt>優先權反轉</dt><dd>高優先權的執行緒被低優先權的卡住，又被中優先權的插隊，等得比預期久很多。</dd></div>
+      <div><dt>優先權繼承</dt><dd>拿著鎖的執行緒暫時借用正在等它的人的優先權，趕快做完放鎖。</dd></div>
+      <div><dt>訊息佇列（msgq）</dt><dd>固定長度的資料排隊區，一邊放、一邊拿，用來在執行緒之間傳資料。</dd></div>
+      <div><dt>work queue</dt><dd>一個專門幫你跑小工作的執行緒，常用來把 ISR 的工作往後延。</dd></div>
+      <div><dt>tick</dt><dd>作業系統計時的基本單位，傳統做法是固定頻率叫醒 CPU 一次。</dd></div>
+      <div><dt>tickless</dt><dd>不固定叫醒，直接把計時器設到下一件事發生的時間，中間一直睡。</dd></div>
+      <div><dt>idle 執行緒</dt><dd>優先權最低的執行緒，沒人要跑的時候讓 CPU 進入睡眠。</dd></div>
+      <div><dt>Devicetree</dt><dd>描述板子上有哪些硬體、接在哪些腳位的文字檔，和程式分開。</dd></div>
+      <div><dt>overlay</dt><dd>專案自己的 Devicetree 補丁檔，用來修改板子預設的設定。</dd></div>
+      <div><dt>Kconfig</dt><dd>Zephyr 的功能開關系統，在 prj.conf 裡寫 CONFIG_XXX=y 打開功能。</dd></div>
+      <div><dt>west</dt><dd>Zephyr 的命令列工具，負責下載原始碼、編譯、燒錄。</dd></div>
+      <div><dt>GPIO</dt><dd>通用輸入輸出腳位，可以讀按鈕、控制 LED。</dd></div>
+      <div><dt>I²C、SPI、UART</dt><dd>晶片和感測器、螢幕、電腦之間常用的三種連接方式。</dd></div>
+      <div><dt>BLE</dt><dd>藍牙低功耗，手錶、手環和手機溝通用的無線技術。</dd></div>
+      <div><dt>廣播間隔、連線間隔</dt><dd>BLE 多久醒來一次喊話或交換資料，越短越快、越耗電。</dd></div>
+      <div><dt>GATT</dt><dd>BLE 連線後交換資料的格式，由服務和特徵值組成。</dd></div>
+      <div><dt>µA、mA</dt><dd>電流單位。1 mA = 1000 µA。手錶睡眠時只有幾 µA。</dd></div>
+    </dl>
+  </div>
+</section>
+
+<div class="anim" role="group" aria-label="動畫控制">
+  <button id="playBtn" type="button" aria-pressed="false">❚❚ 暫停</button>
+  <div class="seg" id="spdSeg" role="group" aria-label="動畫速度"><button data-s="0.25" type="button">慢</button><button data-s="0.5" type="button">中</button><button data-s="1" type="button">快</button></div>
+</div>
+
+<footer>內容依 Zephyr Project 官方文件整理。動畫裡的時間、電流、程式大小都是為了說明而簡化的粗估值，實際數字依晶片和設定而不同。</footer>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C={};
+function readColors(){const cs=getComputedStyle(document.documentElement);
+  ['bg','panel','fg','muted','line','accent','bad','b24','b5','b6','u4'].forEach(k=>C[k]=cs.getPropertyValue('--'+k).trim());}
+readColors();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readColors);
+new MutationObserver(readColors).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+const FONT='"JetBrains Mono","Noto Sans TC",monospace';
+function fit(cv){const r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1,W=Math.round(r.width*d),H=Math.round(r.height*d);
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
+  const x=cv.getContext('2d');x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,r.width,r.height);return[x,r.width,r.height];}
+function seg(el,cb){el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  el.querySelectorAll('button').forEach(o=>o.setAttribute('aria-pressed',o===b?'true':'false'));cb(b);});}
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+/* ---------- 共用：時間軸紀錄與繪製 ---------- */
+function Rec(){const segs=[],last={};return{segs,add(l,t0,t1,k,col,lab){const p=last[l];
+  if(p&&p.k===k&&p.col===col&&p.lab===lab&&Math.abs(p.t1-t0)<1e-6){p.t1=t1;return;}
+  const s={l,t0,t1,k,col,lab};segs.push(s);last[l]=s;}};}
+/* o: {W, names, segs, cur, top, lh, gap, marks:[{l,t,kind}]} 回傳 X(t) 與每排的 y */
+function lanes(x,w,h,o){const LW=w<420?52:68,X=t=>LW+t/o.W*(w-LW-6),Y=i=>o.top+i*(o.lh+o.gap),cur=o.cur;
+  o.names.forEach((n,i)=>{const y=Y(i);x.fillStyle=C.fg;x.font='600 12px '+FONT;x.textAlign='left';x.textBaseline='middle';x.fillText(n,2,y+o.lh/2);
+    x.strokeStyle=C.line;x.lineWidth=1;x.beginPath();x.moveTo(LW,y+o.lh+.5);x.lineTo(w-6,y+o.lh+.5);x.stroke();});
+  o.segs.forEach(s=>{if(s.t0>=cur)return;const t1=Math.min(s.t1,cur),x0=X(s.t0),x1=X(t1),y=Y(s.l),col=C[s.col]||s.col;
+    if(s.k==='run'||s.k==='lock'){x.fillStyle=col;x.fillRect(x0,y+3,Math.max(1,x1-x0),o.lh-6);
+      if(s.k==='lock'){x.fillStyle=C.fg;x.fillRect(x0,y+3,Math.max(1,x1-x0),3);}
+      if(s.lab&&x1-x0>30){x.fillStyle=C.panel;x.font='600 11px '+FONT;x.textAlign='center';x.textBaseline='middle';x.fillText(s.lab,(x0+x1)/2,y+o.lh/2+1);}}
+    else if(s.k==='wait'){x.fillStyle=C.line;x.fillRect(x0,y+o.lh/2-1.5,x1-x0,3);}
+    else if(s.k==='block'){x.globalAlpha=.25;x.fillStyle=C.bad;x.fillRect(x0,y+3,x1-x0,o.lh-6);x.globalAlpha=1;
+      x.setLineDash([3,3]);x.strokeStyle=C.bad;x.lineWidth=1;x.strokeRect(x0+.5,y+3.5,Math.max(0,x1-x0-1),o.lh-7);x.setLineDash([]);
+      if(x1-x0>44){x.fillStyle=C.bad;x.font='600 11px '+FONT;x.textAlign='center';x.textBaseline='middle';x.fillText(s.lab||'等鎖',(x0+x1)/2,y+o.lh/2+1);}}});
+  (o.marks||[]).forEach(m=>{if(m.t>cur)return;const mx=X(m.t),y=Y(m.l);x.fillStyle=C[m.col]||C.fg;x.beginPath();x.moveTo(mx-4,y-5);x.lineTo(mx+4,y-5);x.lineTo(mx,y+1);x.closePath();x.fill();});
+  const ay=Y(o.names.length-1)+o.lh+4;x.fillStyle=C.muted;x.font='10px '+FONT;x.textBaseline='top';x.textAlign='center';
+  const stp=o.W>32?10:5;for(let t=0;t<=o.W+1e-6;t+=stp){const last=t+stp>o.W+1e-6;x.textAlign=last?'right':'center';x.fillText(last?t+' ms':t,last?Math.min(w-2,X(t)+6):X(t),ay);}
+  if(cur<o.W){x.strokeStyle=C.accent;x.lineWidth=1.5;x.beginPath();x.moveTo(X(cur),o.top-8);x.lineTo(X(cur),ay);x.stroke();}
+  x.textAlign='left';return{X,Y,LW};}
+/* 掃描游標：跑完一輪停一下再重來 */
+const sweep=(t,W,rate)=>{if(reduce)return W;const p=(t*rate)%(W+W*.25);return Math.min(W,p);};
+
+/* ---------- 1. 超級迴圈 vs RTOS ---------- */
+const LP_W=40,LP_PRESS=[3.5,13.2,24.6,33.8];
+let lpD=5,lpData=null;
+function buildLoop(D){
+  const seq=[['感測',3,'b5'],['畫面',D,'b6'],['藍牙',3,'b24'],['按鈕?',.7,'u4']];
+  const a=[];let t=0,i=0;while(t<LP_W+20){const s=seq[i%4];a.push({t0:t,t1:t+s[1],lab:s[0],col:s[2],chk:i%4===3});t+=s[1];i++;}
+  const la=LP_PRESS.map(p=>{const c=a.find(s=>s.chk&&s.t0>=p);return[p,c.t1];});
+  const b=[];t=0;i=0;let rem=seq[0][1],pi=0;const lb=[];
+  while(t<LP_W+5){const s=seq[i%3],np=pi<LP_PRESS.length?Math.max(LP_PRESS[pi],t):1e9,end=t+rem;
+    if(np<end){if(np>t)b.push({t0:t,t1:np,lab:s[0],col:s[2]});rem-=np-t;b.push({t0:np,t1:np+.8,lab:'',col:'u4'});lb.push([LP_PRESS[pi],np+.8]);t=np+.8;pi++;}
+    else{b.push({t0:t,t1:end,lab:s[0],col:s[2]});t=end;i++;rem=seq[i%3][1];}}
+  const avg=l=>l.reduce((s,v)=>s+v[1]-v[0],0)/l.length;
+  return{a,b,la,lb,avgA:avg(la),avgB:avg(lb),maxA:Math.max(...la.map(v=>v[1]-v[0]))};}
+function lpUpdate(){lpData=buildLoop(lpD);const d=lpData;
+  $('#lpOut').innerHTML=`超級迴圈：按下按鈕後平均要等 <b class="mono no">${d.avgA.toFixed(1)} ms</b>（最久 ${d.maxA.toFixed(1)} ms）才處理；RTOS：<b class="mono ok">${d.avgB.toFixed(1)} ms</b>。畫面越慢，超級迴圈越慢，RTOS 幾乎不受影響。`;}
+seg($('#lpSeg'),b=>{lpD=+b.dataset.d;lpUpdate();});lpUpdate();
+function drawLoop(t){const[x,w,h]=fit($('#cvLoop'));const d=lpData,cur=sweep(t,LP_W,5);
+  const LW=w<420?52:68,X=v=>LW+v/LP_W*(w-LW-6),lh=30;
+  const rows=[{n:'超級迴圈',y:30,s:d.a,l:d.la},{n:'RTOS',y:30+lh+66,s:d.b,l:d.lb}];
+  rows.forEach(r=>{x.fillStyle=C.fg;x.font='600 12px '+FONT;x.textBaseline='middle';x.textAlign='left';x.fillText(r.n,2,r.y+lh/2);
+    r.s.forEach(s=>{if(s.t0>=cur||s.t0>=LP_W)return;const t1=Math.min(s.t1,cur,LP_W),x0=X(s.t0),x1=X(t1);
+      x.fillStyle=C[s.col];x.fillRect(x0,r.y,Math.max(1,x1-x0-1),lh);
+      if(x1-x0>34&&s.lab){x.fillStyle=C.panel;x.font='600 11px '+FONT;x.textAlign='center';x.fillText(s.lab,(x0+x1)/2,r.y+lh/2+1);}});
+    r.l.forEach(([p,e])=>{if(p>cur)return;const px=X(p);x.fillStyle=C.u4;x.beginPath();x.moveTo(px-5,r.y-12);x.lineTo(px+5,r.y-12);x.lineTo(px,r.y-3);x.closePath();x.fill();
+      const ee=Math.min(e,cur),ly=r.y+lh+10,long=e-p>3,col=long?C.bad:C.b5;x.strokeStyle=col;x.lineWidth=2;x.beginPath();x.moveTo(px,ly-4);x.lineTo(px,ly+4);x.moveTo(px,ly);x.lineTo(X(ee),ly);if(cur>=e){x.moveTo(X(e),ly-4);x.lineTo(X(e),ly+4);}x.stroke();
+      if(cur>=e){x.fillStyle=col;x.font='600 11px '+FONT;x.textAlign='left';x.textBaseline='top';x.fillText('等 '+(e-p).toFixed(1)+' ms',px,ly+6);x.textBaseline='middle';}});});
+  x.fillStyle=C.muted;x.font='10px '+FONT;x.textBaseline='bottom';x.textAlign='center';for(let v=0;v<=LP_W;v+=10){const last=v===LP_W;x.textAlign=last?'right':'center';x.fillText(last?v+' ms':v,last?w-2:X(v),h-2);}
+  x.fillStyle=C.muted;x.textAlign='left';x.textBaseline='top';x.fillText('▼ 按下按鈕',LW,0);
+  if(cur<LP_W){x.strokeStyle=C.accent;x.lineWidth=1.5;x.beginPath();x.moveTo(X(cur),14);x.lineTo(X(cur),h-14);x.stroke();}x.textAlign='left';}
+
+/* ---------- 2. 排程 ---------- */
+const SCH_T=[{n:'按鈕 1',p:1,c:'u4',jobs:[[6,1.5],[19,1.5],[33,1.5]]},{n:'畫面 5',p:5,c:'b6',jobs:[[0,3],[12,3],[24,3],[36,3]]},{n:'上傳 8',p:8,c:'b24',jobs:[[1,12]]},{n:'記錄 8',p:8,c:'b5',jobs:[[2,9]]}];
+const SCH_W=44;let schMode='pre',schData=null;
+function simSch(mode){const dt=.1,N=Math.round(SCH_W/dt),th=SCH_T.map(o=>({...o,q:o.jobs.map(j=>({rel:j[0],rem:j[1]})),done:[]})),rec=Rec(),marks=[];
+  SCH_T.forEach((o,i)=>o.jobs.forEach(j=>marks.push({l:i,t:j[0],col:o.c})));
+  let cur=-1,used=0,order=[];
+  for(let s=0;s<N;s++){const t=s*dt+1e-9,rd=th.map(o=>o.q.length>0&&o.q[0].rel<=t);
+    rd.forEach((r,i)=>{if(r&&!order.includes(i))order.push(i);});order=order.filter(i=>rd[i]);
+    let pick=-1;
+    if(order.length){if(mode==='coop'&&cur>=0&&rd[cur])pick=cur;
+      else{const mp=Math.min(...order.map(i=>th[i].p)),cand=order.filter(i=>th[i].p===mp);
+        if(cur>=0&&cand.includes(cur)){if(mode==='slice'&&used>=2-1e-6&&cand.length>1){order=order.filter(k=>k!==cur);order.push(cur);pick=order.find(i=>cand.includes(i));}else pick=cur;}
+        else pick=cand[0];}}
+    if(pick!==cur)used=0;cur=pick;
+    th.forEach((o,i)=>{if(i===cur)rec.add(i,s*dt,(s+1)*dt,'run',o.c,'');else if(rd[i])rec.add(i,s*dt,(s+1)*dt,'wait','line','');});
+    if(cur>=0){const j=th[cur].q[0];j.rem-=dt;used+=dt;if(j.rem<=1e-6){th[cur].done.push(t+dt-j.rel);th[cur].q.shift();used=0;}}}
+  return{segs:rec.segs,marks,th};}
+function schUpdate(){schData=simSch(schMode);const b=schData.th[0].done,bmax=Math.max(...b),up=schData.th[2],lg=schData.th[3];
+  const sw=schData.segs.filter(s=>s.k==='run'&&s.l>=2).length;
+  const msg={pre:`按鈕每次都在 <b class="mono ok">${bmax.toFixed(1)} ms</b> 內處理完，因為它一就緒就搶走 CPU。「上傳」和「記錄」優先權一樣、又沒有時間切片，所以「記錄」要等「上傳」整個做完才輪到。`,
+    slice:`按鈕一樣很快（<b class="mono ok">${bmax.toFixed(1)} ms</b>）。「上傳」和「記錄」每 2 ms 輪流一次，兩個背景工作一起往前進，不會有人被餓死。代價是切換次數變多（背景執行緒切了 ${sw} 段）。`,
+    coop:`協作式不會被搶，正在跑的人要做完才換人。按鈕最久要等 <b class="mono no">${bmax.toFixed(1)} ms</b>，因為它要等很長的「上傳」或「記錄」做完。所以長工作不要用協作式，或是中途要自己 <code>k_yield()</code>。`};
+  $('#schOut').innerHTML=msg[schMode];}
+seg($('#schSeg'),b=>{schMode=b.dataset.m;schUpdate();});schUpdate();
+function drawSch(t){const[x,w,h]=fit($('#cvSch'));lanes(x,w,h,{W:SCH_W,names:SCH_T.map(o=>o.n),segs:schData.segs,marks:schData.marks,cur:sweep(t,SCH_W,6),top:20,lh:40,gap:12});
+  x.fillStyle=C.muted;x.font='10px '+FONT;x.textAlign='left';x.textBaseline='top';x.fillText('名字 + 優先權',0,0);}
+
+/* ---------- 3. 中斷 ---------- */
+const ISR_W=30,UART=[];for(let v=.5;v<ISR_W;v+=2.5)UART.push(v);const BTN=[5,19];
+let isrMode='long',isrData=null;
+function simIsr(mode){const dt=.05,N=Math.round(ISR_W/dt),rec=Rec(),pend=[],res=UART.map(()=>'?');let isr=null,thWork=0,ui=0,bi=0;
+  for(let s=0;s<N;s++){const t=s*dt+1e-9;
+    while(ui<UART.length&&UART[ui]<=t){pend.push({k:'u',i:ui,arr:UART[ui],d:.3});ui++;}
+    while(bi<BTN.length&&BTN[bi]<=t){pend.push({k:'b',arr:BTN[bi],d:mode==='long'?7:.4});bi++;}
+    for(let j=pend.length-1;j>=0;j--){const p=pend[j];if(p.k==='u'&&t-p.arr>1.2){res[p.i]='lost';pend.splice(j,1);}}
+    if(!isr&&pend.length){isr=pend.shift();isr.rem=isr.d;}
+    if(isr){rec.add(0,s*dt,(s+1)*dt,'run',isr.k==='u'?'b5':'u4',isr.k==='u'?'':'按鈕 ISR');if(thWork>0)rec.add(1,s*dt,(s+1)*dt,'wait','line','');
+      isr.rem-=dt;if(isr.rem<=1e-6){if(isr.k==='u')res[isr.i]='ok';else if(mode==='short')thWork+=7;isr=null;}}
+    else if(thWork>0){rec.add(1,s*dt,(s+1)*dt,'run','u4','處理按鈕');thWork-=dt;}
+    else rec.add(2,s*dt,(s+1)*dt,'run','b24','');}
+  return{segs:rec.segs,res};}
+function isrUpdate(){isrData=simIsr(isrMode);const lost=isrData.res.filter(r=>r==='lost').length,n=UART.length;
+  $('#isrOut').innerHTML=isrMode==='long'?`按鈕 ISR 一跑就是 7 ms，這段時間序列埠的中斷只能排隊，等太久的字就被蓋掉了：${n} 個字遺失 <b class="mono no">${lost}</b> 個。`:
+    `ISR 只花 0.4 ms 給一個號誌就結束，7 ms 的工作交給「按鈕執行緒」。執行緒隨時可以被中斷打斷，序列埠每個字都能準時收：${n} 個字遺失 <b class="mono ${lost?'no':'ok'}">${lost}</b> 個。`;}
+seg($('#isrSeg'),b=>{isrMode=b.dataset.m;isrUpdate();});isrUpdate();
+function drawIsr(t){const[x,w,h]=fit($('#cvIsr'));const cur=sweep(t,ISR_W,5);
+  const L=lanes(x,w,h,{W:ISR_W,names:['中斷','按鈕執行緒','其他工作'],segs:isrData.segs,marks:BTN.map(b=>({l:0,t:b,col:'u4'})),cur,top:36,lh:38,gap:16});
+  const y=L.Y(0)-18;x.fillStyle=C.muted;x.font='10px '+FONT;x.textAlign='left';x.textBaseline='bottom';x.fillText('序列埠收到字',0,y+4);
+  UART.forEach((u,i)=>{if(u>cur)return;const ux=L.X(u),r=isrData.res[i],decided=r==='lost'?u+1.2<=cur:true;
+    if(r==='lost'&&decided){x.strokeStyle=C.bad;x.lineWidth=2;x.beginPath();x.moveTo(ux-4,y-4);x.lineTo(ux+4,y+4);x.moveTo(ux+4,y-4);x.lineTo(ux-4,y+4);x.stroke();}
+    else{x.fillStyle=C.b5;x.fillRect(ux-1.5,y-5,3,10);}});}
+
+/* ---------- 4. 優先權反轉 ---------- */
+const INV=[{n:'高 H',p:2,c:'u4',rel:3,st:[['w',1],['L'],['w',2],['U'],['w',1]]},{n:'中 M',p:5,c:'b6',rel:4,st:[['w',9]]},{n:'低 L',p:8,c:'b24',rel:0,st:[['w',1],['L'],['w',4],['U'],['w',1]]}];
+const INV_W=26;let invMode='sem',invData=null;
+function simInv(mode){const dt=.1,N=Math.round(INV_W/dt),rec=Rec(),th=INV.map(o=>({...o,si:0,rem:o.st[0][1],blk:false,req:null,got:null}));let owner=-1,wait=[];
+  const ep=i=>{let p=th[i].p;if(mode==='mutex'&&owner===i)wait.forEach(k=>p=Math.min(p,th[k].p));return p;};
+  const ready=(i,t)=>th[i].rel<=t&&!th[i].blk&&th[i].si<th[i].st.length;
+  const adv=i=>{const o=th[i];o.si++;if(o.si<o.st.length&&o.st[o.si][0]==='w')o.rem=o.st[o.si][1];};
+  for(let s=0;s<N;s++){const t=s*dt+1e-9;let cur=-1;
+    for(let g=0;g<6;g++){cur=-1;let bp=99;th.forEach((o,i)=>{if(ready(i,t)&&ep(i)<bp){bp=ep(i);cur=i;}});if(cur<0)break;
+      const o=th[cur],op=o.st[o.si][0];
+      if(op==='L'){if(owner<0){owner=cur;if(o.req!==null)o.got=t;adv(cur);}else{o.blk=true;o.req=t;wait.push(cur);}continue;}
+      if(op==='U'){owner=-1;adv(cur);if(wait.length){wait.sort((a,b)=>th[a].p-th[b].p);const n=wait.shift();th[n].blk=false;owner=n;th[n].got=t;adv(n);}continue;}
+      break;}
+    th.forEach((o,i)=>{const a=s*dt,b=(s+1)*dt;
+      if(i===cur){const boosted=ep(i)<o.p;rec.add(i,a,b,owner===i?'lock':'run',o.c,boosted?'借優先權 2':(owner===i?'用 I²C':''));}
+      else if(o.blk)rec.add(i,a,b,'block','bad','等鎖');
+      else if(ready(i,t))rec.add(i,a,b,'wait','line','');});
+    if(cur>=0){const o=th[cur];o.rem-=dt;if(o.rem<=1e-6)adv(cur);}}
+  return{segs:rec.segs,H:th[0]};}
+function invUpdate(){invData=simInv(invMode);const H=invData.H,wt=H.got-H.req;
+  $('#invOut').innerHTML=invMode==='sem'?`H 在第 ${H.req.toFixed(0)} ms 要鎖，但 L 拿著鎖又被 M 搶走，H 足足等了 <b class="mono no">${wt.toFixed(0)} ms</b>。M 跟鎖一點關係都沒有，卻讓最重要的 H 卡住。`:
+    `H 一開始等鎖，Zephyr 就把 L 的優先權暫時提升到跟 H 一樣（2），M 搶不走它。L 趕快做完放鎖、恢復原本的優先權，H 只等了 <b class="mono ok">${wt.toFixed(0)} ms</b>。`;}
+seg($('#invSeg'),b=>{invMode=b.dataset.m;invUpdate();});invUpdate();
+function drawInv(t){const[x,w,h]=fit($('#cvInv'));lanes(x,w,h,{W:INV_W,names:INV.map(o=>o.n),segs:invData.segs,marks:INV.map((o,i)=>({l:i,t:o.rel,col:o.c})),cur:sweep(t,INV_W,4),top:20,lh:42,gap:14});}
+
+/* ---------- 5. 訊息佇列 ---------- */
+const Q={};function qReset(){Object.assign(Q,{t:0,np:0,q:[],busy:0,stall:0,ns:2,sent:0,drop:0,made:0,hist:[],fly:[]});}
+qReset();
+function qVals(){return{cap:+$('#qCap').value,proc:+$('#qProc').value/1000,stall:$('#qStall').checked};}
+function qLabels(){const v=qVals();$('#qCapO').textContent=v.cap+' 筆';$('#qProcO').textContent=Math.round(v.proc*1000)+' ms';}
+['qCap','qProc','qStall'].forEach(id=>$('#'+id).addEventListener('input',()=>{qLabels();qReset();}));qLabels();
+function qStep(dt){const v=qVals();let left=dt;while(left>1e-9){const h=Math.min(left,.01);left-=h;Q.t+=h;
+  if(Q.t>=Q.np){Q.np+=.1;Q.made++;if(Q.q.length<v.cap){Q.q.push(Q.made);Q.fly.push({t:Q.t});}else{Q.drop++;Q.hist.push({t:Q.t,n:Q.q.length,d:1});}}
+  if(v.stall&&Q.t>=Q.ns){Q.stall=Q.t+.8;Q.ns+=4;}
+  const stalled=Q.t<Q.stall;
+  if(!stalled){if(Q.busy>0){Q.busy-=h;if(Q.busy<=0){Q.sent++;Q.busy=0;}}
+    if(Q.busy<=0&&Q.q.length){Q.q.shift();Q.busy=v.proc;}}
+  if(!Q.hist.length||Q.t-Q.hist[Q.hist.length-1].t>=.05)Q.hist.push({t:Q.t,n:Q.q.length});}
+  while(Q.hist.length&&Q.hist[0].t<Q.t-8)Q.hist.shift();Q.fly=Q.fly.filter(f=>Q.t-f.t<.25);}
+let qFactAt=0;
+function drawQ(dt,ms){if(!reduce)qStep(dt);const[x,w,h]=fit($('#cvQ'));const v=qVals(),stalled=Q.t<Q.stall;
+  const top=8,bh=74,sx=92,ex=w-110,sw=Math.min(36,(ex-sx)/v.cap-4),qw=v.cap*(sw+4);const qx=sx+(ex-sx-qw)/2;
+  x.fillStyle=C.b5;x.beginPath();x.arc(40,top+bh/2,24,0,7);x.fill();x.fillStyle=C.panel;x.font='600 12px '+FONT;x.textAlign='center';x.textBaseline='middle';x.fillText('♥',40,top+bh/2);
+  x.fillStyle=C.muted;x.font='11px '+FONT;x.fillText('感測器',40,top+bh/2+36);
+  Q.fly.forEach(f=>{const p=(Q.t-f.t)/.25,fx=64+(qx-64)*p;x.fillStyle=C.b5;x.beginPath();x.arc(fx,top+bh/2,4,0,7);x.fill();});
+  for(let i=0;i<v.cap;i++){const bx=qx+i*(sw+4),full=i<Q.q.length;x.strokeStyle=C.line;x.lineWidth=1.5;x.strokeRect(bx+.5,top+bh/2-sw/2+.5,sw,sw);
+    if(full){x.fillStyle=C.b5;x.globalAlpha=.85;x.fillRect(bx+3,top+bh/2-sw/2+3,sw-5,sw-5);x.globalAlpha=1;}}
+  x.fillStyle=C.muted;x.font='11px '+FONT;x.textAlign='center';x.fillText('k_msgq（'+Q.q.length+'/'+v.cap+'）',qx+qw/2,top+bh/2+sw/2+14);
+  const cx=w-60,cy=top+bh/2;x.fillStyle=stalled?C.bad:C.b6;x.beginPath();x.roundRect?x.roundRect(cx-40,cy-24,80,48,8):x.rect(cx-40,cy-24,80,48);x.fill();
+  x.fillStyle=C.panel;x.font='600 12px '+FONT;x.fillText(stalled?'藍牙忙':'藍牙',cx,cy-6);
+  if(Q.busy>0&&!stalled){x.fillStyle=C.panel;x.globalAlpha=.4;x.fillRect(cx-30,cy+8,60,6);x.globalAlpha=1;x.fillRect(cx-30,cy+8,60*(1-Q.busy/v.proc),6);}
+  const gy=top+bh+34,gh=h-gy-18,gx=36,gw=w-gx-8,T0=Q.t-8;
+  x.strokeStyle=C.line;x.lineWidth=1;x.strokeRect(gx+.5,gy+.5,gw,gh);
+  const Yq=n=>gy+gh-n/12*gh,Xq=t=>gx+(t-T0)/8*gw;
+  x.setLineDash([4,3]);x.strokeStyle=C.muted;x.beginPath();x.moveTo(gx,Yq(v.cap));x.lineTo(gx+gw,Yq(v.cap));x.stroke();x.setLineDash([]);
+  x.fillStyle=C.muted;x.font='10px '+FONT;x.textAlign='right';x.textBaseline='middle';x.fillText(v.cap,gx-4,Yq(v.cap));x.fillText('0',gx-4,Yq(0));
+  x.textAlign='left';x.textBaseline='bottom';x.fillText('佇列裡有幾筆（最近 8 秒）',gx+4,gy-2);
+  x.strokeStyle=C.b5;x.lineWidth=2;x.beginPath();let f=true;Q.hist.forEach(p=>{if(p.d)return;const px=Xq(p.t),py=Yq(p.n);f?x.moveTo(px,py):x.lineTo(px,py);f=false;});x.stroke();
+  x.fillStyle=C.bad;Q.hist.forEach(p=>{if(p.d){x.beginPath();x.arc(Xq(p.t),Yq(v.cap)-6,3,0,7);x.fill();}});
+  x.textAlign='left';
+  if(ms-qFactAt>250){qFactAt=ms;const loss=Q.made?Q.drop/Q.made*100:0;
+    $('#qFacts').innerHTML=`<div><b>${Q.made}</b>感測器產生</div><div><b>${Q.sent}</b>送到手機</div><div><b class="${Q.drop?'no':'ok'}">${Q.drop}</b>佇列滿了丟掉</div><div><b class="${loss>0.5?'no':'ok'}">${loss.toFixed(1)}%</b>遺失率</div>`;}}
+
+/* ---------- 6. tick vs tickless ---------- */
+let tkRate=100;
+function tkFacts(){const sleep=3,wake=3000,work=2*wake*.002/.5;
+  const tick=tkRate*20e-6*wake,ta=sleep+work+tick,tl=sleep+work;
+  $('#tkFacts').innerHTML=`<div><b>${tkRate+2}</b>固定 tick：每秒醒來次數</div><div><b>2</b>tickless：每秒醒來次數</div><div><b class="no">${ta.toFixed(0)} µA</b>固定 tick 平均電流</div><div><b class="ok">${tl.toFixed(0)} µA</b>tickless 平均電流</div>`;}
+seg($('#tkSeg'),b=>{tkRate=+b.dataset.r;tkFacts();});tkFacts();
+function drawTick(t){const[x,w,h]=fit($('#cvTick'));const now=reduce?1:t*.6,T0=now-1,LW=w<420?60:84,X=v=>LW+(v-T0)/1*(w-LW-6);
+  const rows=[{n:'固定 tick',y:30,tick:true},{n:'tickless',y:30+ (h-60)/2+10,tick:false}],rh=(h-70)/2;
+  rows.forEach(r=>{const base=r.y+rh,hi=r.y+6;x.fillStyle=C.fg;x.font='600 12px '+FONT;x.textAlign='left';x.textBaseline='middle';x.fillText(r.n,2,r.y+rh/2);
+    x.fillStyle=C.muted;x.font='10px '+FONT;x.fillText(r.tick?tkRate+' Hz':'只在需要時',2,r.y+rh/2+15);
+    x.strokeStyle=C.line;x.lineWidth=1;x.beginPath();x.moveTo(LW,base+.5);x.lineTo(w-6,base+.5);x.stroke();
+    if(r.tick){const per=1/tkRate,minW=tkRate>500?1:1.5;x.fillStyle=C.b24;for(let k=Math.ceil(T0/per);k*per<=now;k++){const px=X(k*per);x.fillRect(px,base-rh*.45,minW,rh*.45);}}
+    x.fillStyle=C.b6;for(let k=Math.ceil(T0/.5);k*.5<=now;k++){const px=X(k*.5);x.fillRect(px,hi,Math.max(5,X(k*.5+.002)-px),base-hi);
+      x.fillStyle=C.muted;x.font='10px '+FONT;x.textAlign='left';x.textBaseline='top';x.fillText('工作',px+8,hi);x.fillStyle=C.b6;}});
+  x.fillStyle=C.muted;x.font='10px '+FONT;x.textAlign='left';x.textBaseline='bottom';x.fillText('最近 1 秒 ← 時間',LW,14);
+  x.fillStyle=C.b24;x.fillRect(LW+120,6,8,8);x.fillStyle=C.muted;x.fillText('被 tick 叫醒（沒事做）',LW+132,15);}
+
+/* ---------- 7. Devicetree ---------- */
+const BOARDS=[
+  {name:'nRF52840 DK',b:'nrf52840dk/nrf52840',chip:'nRF52840',col:'accent',ctl:'gpio0',pin:13,pn:'P0.13',low:true,node:'led0: led_0',lbl:'Green LED 0',file:'boards/nordic/nrf52840dk/nrf52840dk_nrf52840.dts'},
+  {name:'NUCLEO-F401RE',b:'nucleo_f401re',chip:'STM32F401',col:'b24',ctl:'gpioa',pin:5,pn:'PA5',low:false,node:'green_led_2: led_2',lbl:'User LD2',file:'boards/st/nucleo_f401re/nucleo_f401re.dts'},
+  {name:'Raspberry Pi Pico',b:'rpi_pico',chip:'RP2040',col:'b5',ctl:'gpio0',pin:25,pn:'GP25',low:false,node:'led0: led_0',lbl:'LED',file:'boards/raspberrypi/rpi_pico/rpi_pico-common.dtsi'}];
+let bd=0;
+function bdUpdate(){const o=BOARDS[bd],lab=o.node.split(':')[0];$('#bdFile').textContent=o.file+'（節錄）';
+  $('#bdDts').innerHTML=`/ {
+    aliases {
+        <span class="h">led0</span> = &amp;${lab};
+    };
+    leds {
+        compatible = "gpio-leds";
+        ${o.node} {
+            gpios = &lt;&amp;${o.ctl} <span class="h">${o.pin}</span> <span class="h">${o.low?'GPIO_ACTIVE_LOW':'GPIO_ACTIVE_HIGH'}</span>&gt;;
+            label = "${o.lbl}";
+        };
+    };
+};`;
+  $('#bdOut').innerHTML=`編譯指令：<code>west build -b ${o.b} samples/basic/blinky</code>。這塊板子的 LED 接在 <b>${o.pn}</b>，${o.low?'<b>低電位</b>才亮（GPIO_ACTIVE_LOW），所以程式說「亮」的時候，Zephyr 會把腳位設成 0 V':'<b>高電位</b>就亮（GPIO_ACTIVE_HIGH）'}。`;}
+seg($('#bdSeg'),b=>{bd=+b.dataset.b;bdUpdate();});bdUpdate();
+function drawBoard(t){const[x,w,h]=fit($('#cvBoard'));const o=BOARDS[bd],on=reduce?true:Math.floor(t*1.2)%2===0,lvl=o.low?!on:on,col=C[o.col];
+  const bw=Math.min(w-20,520),bx=(w-bw)/2,by=14,bh=h-40;
+  x.fillStyle=col;x.globalAlpha=.14;x.fillRect(bx,by,bw,bh);x.globalAlpha=1;x.strokeStyle=col;x.lineWidth=2;x.strokeRect(bx+1,by+1,bw-2,bh-2);
+  x.fillStyle=col;x.font='600 12px '+FONT;x.textAlign='left';x.textBaseline='top';x.fillText(o.name,bx+10,by+8);
+  const cs=Math.min(90,bh-50),cx=bx+bw*.28-cs/2,cy=by+(bh-cs)/2+8;x.fillStyle=C.fg;x.fillRect(cx,cy,cs,cs);
+  x.fillStyle=C.muted;for(let i=0;i<6;i++){const p=cy+10+i*(cs-20)/5;x.fillRect(cx-6,p-1.5,6,3);x.fillRect(cx+cs,p-1.5,6,3);}
+  x.fillStyle=C.panel;x.font='600 11px '+FONT;x.textAlign='center';x.textBaseline='middle';x.fillText(o.chip,cx+cs/2,cy+cs/2);
+  const py=cy+10+2*(cs-20)/5,lx=bx+bw*.74,ly=py;
+  x.strokeStyle=lvl?C.b24:C.muted;x.lineWidth=3;x.beginPath();x.moveTo(cx+cs+6,py);x.lineTo(lx-16,ly);x.stroke();
+  x.fillStyle=C.fg;x.font='600 12px '+FONT;x.textAlign='center';x.textBaseline='bottom';x.fillText(o.pn,(cx+cs+lx)/2,py-6);
+  x.fillStyle=lvl?C.b24:C.muted;x.font='11px '+FONT;x.textBaseline='top';x.fillText(lvl?'HIGH 3.3 V':'LOW 0 V',(cx+cs+lx)/2,py+6);
+  if(on){x.fillStyle=C.b5;x.globalAlpha=.25;x.beginPath();x.arc(lx,ly,26,0,7);x.fill();x.globalAlpha=1;}
+  x.fillStyle=on?C.b5:C.line;x.beginPath();x.arc(lx,ly,13,0,7);x.fill();x.strokeStyle=C.muted;x.lineWidth=1;x.stroke();
+  x.fillStyle=C.fg;x.font='600 12px '+FONT;x.textBaseline='top';x.fillText(on?'LED 亮':'LED 暗',lx,ly+30);
+  x.fillStyle=C.muted;x.font='11px '+FONT;x.textBaseline='bottom';x.fillText('led0',lx,ly-18);x.textAlign='left';}
+
+/* ---------- 8. Kconfig ---------- */
+const CHIPS=[['nRF52832',512,64],['nRF52840',1024,256],['nRF5340（應用核心）',1024,512]];
+const KOPT=[
+  {id:'base',n:'核心 + main',c:'CONFIG_GPIO=y',f:12,r:4,fixed:true,col:'muted'},
+  {id:'log',n:'LOG 日誌',c:'CONFIG_LOG=y',f:10,r:3,col:'b24'},
+  {id:'shell',n:'Shell 命令列',c:'CONFIG_SHELL=y',f:24,r:8,col:'b24'},
+  {id:'bt',n:'藍牙（周邊裝置）',c:'CONFIG_BT=y\nCONFIG_BT_PERIPHERAL=y\nCONFIG_BT_DEVICE_NAME="Momo Watch"',f:140,r:28,col:'accent'},
+  {id:'set',n:'存設定（settings + NVS）',c:'CONFIG_SETTINGS=y\nCONFIG_NVS=y',f:12,r:2,col:'b5'},
+  {id:'disp',n:'螢幕 + LVGL 圖形介面',c:'CONFIG_DISPLAY=y\nCONFIG_LVGL=y',f:190,r:48,col:'b6'},
+  {id:'dfu',n:'無線韌體更新（MCUboot）',c:'CONFIG_BOOTLOADER_MCUBOOT=y',f:300,r:6,col:'u4',note:'要預留第二份韌體的空間'}];
+let kcChip=0;const kcOn=new Set(['base','bt']);
+$('#kcOpts').innerHTML=KOPT.filter(o=>!o.fixed).map(o=>`<label><input type="checkbox" data-id="${o.id}" ${kcOn.has(o.id)?'checked':''}><span>${o.n}<small>約 +${o.f} KB / +${o.r} KB RAM${o.note?'，'+o.note:''}</small></span></label>`).join('');
+$('#kcOpts').addEventListener('change',e=>{const id=e.target.dataset.id;if(!id)return;e.target.checked?kcOn.add(id):kcOn.delete(id);kcUpdate();});
+seg($('#kcChip'),b=>{kcChip=+b.dataset.c;kcUpdate();});
+function meter(el,label,cap,key){const on=KOPT.filter(o=>kcOn.has(o.id)),tot=on.reduce((s,o)=>s+o[key],0),over=tot>cap,scale=Math.max(cap,tot);
+  el.classList.toggle('over',over);
+  el.innerHTML=`<div class="mh"><span>${label}</span><b>${tot} / ${cap} KB${over?'　放不下！':'　（'+Math.round(tot/cap*100)+'%）'}</b></div><div class="track">${on.map(o=>`<i title="${o.n}" style="width:${o[key]/scale*100}%;background:var(--${o.col})"></i>`).join('')}</div>`;}
+function kcUpdate(){const c=CHIPS[kcChip];meter($('#kcFlash'),c[0]+' 快閃記憶體（放程式）',c[1],'f');meter($('#kcRam'),'RAM（執行時的資料）',c[2],'r');
+  $('#kcConf').innerHTML=KOPT.filter(o=>kcOn.has(o.id)).map(o=>`<span class="c"># ${o.n}</span>\n`+esc(o.c)).join('\n');}
+kcUpdate();
+
+/* ---------- 9. BLE ---------- */
+let bleMode='adv';
+const BLE={adv:{lo:20,hi:10240,unit:.625,q:20,name:'廣播間隔'},conn:{lo:7.5,hi:4000,unit:1.25,q:6,name:'連線間隔'}};
+function bleI(){const m=BLE[bleMode],v=+$('#bleI').value/100,raw=m.lo*Math.pow(m.hi/m.lo,v);return Math.max(m.lo,Math.round(raw/m.unit)*m.unit);}
+const fmtMs=v=>v>=1000?(v/1000).toFixed(v>=10000?1:2)+' 秒':(v%1?v.toFixed(2):v)+' ms';
+function fmtLife(h){const d=h/24;return d>=365?(d/365).toFixed(1)+' 年':d>=1?Math.round(d)+' 天':h.toFixed(0)+' 小時';}
+function bleUpdate(){const m=BLE[bleMode],I=bleI();$('#bleIL').textContent=m.name;$('#bleIO').textContent=fmtMs(I);
+  const avg=2+m.q/(I/1000),life=220000/avg;
+  $('#bleFacts').innerHTML=bleMode==='adv'?
+    `<div><b>${avg<100?avg.toFixed(1):Math.round(avg)} µA</b>平均電流</div><div><b>${fmtLife(life)}</b>CR2032 撐多久</div><div><b>${fmtMs(I)}</b>手機一直在掃描時，最多等這麼久才找到（手機省電掃描會更久）</div>`:
+    `<div><b>${avg<100?avg.toFixed(1):Math.round(avg)} µA</b>平均電流</div><div><b>${fmtLife(life)}</b>CR2032 撐多久</div><div><b>${fmtMs(I)}</b>按下按鈕到手機收到，最多延遲</div><div><b>${(1000/I).toFixed(I>1000?2:0)}</b>每秒能交換資料幾次</div>`;}
+seg($('#bleSeg'),b=>{bleMode=b.dataset.m;$('#bleI').value=bleMode==='adv'?40:30;bleUpdate();});
+$('#bleI').addEventListener('input',bleUpdate);bleUpdate();
+const hash=k=>{const s=Math.sin(k*12.9898)*43758.5453;return s-Math.floor(s);};
+function drawBle(t){const[x,w,h]=fit($('#cvBle'));const I=bleI()/1000,now=reduce?4:t*.8+4,T0=now-4,LW=6,X=v=>LW+(v-T0)/4*(w-LW-6),base=h-26,top=28;
+  x.strokeStyle=C.line;x.lineWidth=1;x.beginPath();x.moveTo(0,base+.5);x.lineTo(w,base+.5);x.stroke();
+  x.fillStyle=C.muted;x.font='10px '+FONT;x.textBaseline='top';for(let s=0;s<=4;s++){x.textAlign=s===0?'left':s===4?'right':'center';x.fillText(s===4?'現在':'−'+(4-s)+' 秒',s===0?0:s===4?w:X(T0+s),base+6);}
+  const adv=bleMode==='adv',col=adv?C.accent:C.b5,many=4/I>120;
+  for(let k=Math.floor(T0/I)-1;k*I<=now;k++){const et=k*I+(adv?hash(k)*.01:0);if(et<T0||et>now)continue;const px=X(et);
+    if(adv&&!many&&I>=.4){[0,1,2].forEach(c=>{x.fillStyle=col;x.fillRect(px+c*5,top+6,3,base-top-6);});
+      if(I>=1){x.fillStyle=C.muted;x.font='10px '+FONT;x.textAlign='left';x.textBaseline='bottom';x.fillText('37 38 39',px-2,top+4);}}
+    else{x.fillStyle=col;x.globalAlpha=many?.6:1;x.fillRect(px,adv?top+6:top+30,many?1:2.5,base-(adv?top+6:top+30));x.globalAlpha=1;}}
+  x.fillStyle=C.muted;x.font='11px '+FONT;x.textAlign='left';x.textBaseline='top';x.fillText(adv?'無線電電流（每根是一次廣播）':'無線電電流（每根是一次連線事件）',LW,2);}
+
+/* ---------- 迴圈 ---------- */
+const vis=new Map();const io=new IntersectionObserver(es=>es.forEach(e=>vis.set(e.target.id,e.isIntersecting)),{rootMargin:'80px'});
+document.querySelectorAll('canvas').forEach(c=>{vis.set(c.id,true);io.observe(c);});
+let prev=0,vt=0,speed=.5,paused=false;
+try{const v=parseFloat(localStorage.getItem('animSpeed'));if([.25,.5,1].includes(v))speed=v;}catch(e){}
+const pb=$('#playBtn'),sp=$('#spdSeg');
+function pbShow(){pb.textContent=paused?'▶ 播放':'❚❚ 暫停';pb.setAttribute('aria-pressed',paused?'true':'false');document.body.classList.toggle('paused',paused);}
+function togglePause(){paused=!paused;pbShow();}
+pb.addEventListener('click',togglePause);
+sp.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.s===speed?'true':'false'));
+seg(sp,b=>{speed=+b.dataset.s;try{localStorage.setItem('animSpeed',speed)}catch(e){}if(paused){paused=false;pbShow();}});
+document.querySelectorAll('canvas').forEach(c=>c.addEventListener('click',togglePause));
+pbShow();
+function frame(ms){const real=Math.min(.05,prev?ms/1000-prev:0);prev=ms/1000;const dt=paused?0:real*speed;vt+=dt;const t=vt;
+  if(vis.get('cvLoop'))drawLoop(t);
+  if(vis.get('cvSch'))drawSch(t);
+  if(vis.get('cvIsr'))drawIsr(t);
+  if(vis.get('cvInv'))drawInv(t);
+  if(vis.get('cvQ'))drawQ(dt*2,ms);
+  if(vis.get('cvTick'))drawTick(t);
+  if(vis.get('cvBoard'))drawBoard(t);
+  if(vis.get('cvBle'))drawBle(t);
+  requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

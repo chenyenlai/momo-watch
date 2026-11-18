@@ -6,6 +6,7 @@
 - 🚗 [國1 通勤路況](https://chenyenlai.github.io/momo-watch/traffic.html)
 - 🌀 [戰鬥陀螺開賣表](https://chenyenlai.github.io/momo-watch/funbox.html)
 - 📶 [Wi-Fi 技術入門](https://chenyenlai.github.io/wifi-intro/)
+- 🧩 [Zephyr RTOS 入門](https://chenyenlai.github.io/momo-watch/zephyr.html)
 
 ## 說明
 
