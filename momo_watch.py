@@ -8,6 +8,7 @@
     python3 momo_watch.py --test       送一則測試推播
     python3 momo_watch.py --dry-run    只印結果，不推播、不記錄
     python3 momo_watch.py --list       把即將開賣清單推播一次
+    python3 momo_watch.py --sizes      只檢查 SIZE_WATCH 的尺寸庫存並印出判斷依據（不推播）
 
 第一次執行只會把目前所有商品記下來（送一則「開始監測」），之後出現沒看過的商品才會通知。
 FUNBOX 的預購商品會記下開賣時間，開賣前 REMIND_BEFORE 分鐘再提醒一次。
@@ -45,6 +46,11 @@ SHOP_FEEDS = [
 ]
 SHOP_SKIP = ['APP兌換']
 SHOP_RESTOCK = False  # True = 庫存從 0 變有貨也通知
+
+# 指定尺寸補貨監測：缺貨 → 有貨時推播，並記錄每次狀態變化的時間（看得出缺貨多久）
+SIZE_WATCH = [
+    {'name': 'RAB Xenair Alpine 外套 黑', 'url': 'https://s.momoshop.com.tw/s/P3XDJDPz', 'sizes': ['L']},
+]
 
 REMIND_BEFORE = int(os.environ.get('REMIND_BEFORE', '15'))  # 開賣前幾分鐘提醒；0 = 不提醒
 
@@ -226,6 +232,133 @@ def check_shop(state, dry_run=False):
             log('官網補貨：', k, it['name'])
 
 
+def get_html(url):
+    req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept-Language': 'zh-TW,zh;q=0.9'})
+    resp = urllib.request.urlopen(req, timeout=30)
+    return resp.geturl(), resp.read().decode('utf-8', 'replace')
+
+
+def goods_code(url):
+    """短網址 / 商品網址 → i_code"""
+    m = re.search(r'(?:i_code=|/goods/|/product/)(\d{5,})', url)
+    if m:
+        return m.group(1)
+    final, html = get_html(url)
+    m = re.search(r'(?:i_code=|/goods/|/product/)(\d{5,})', final) or re.search(r'i_code=(\d{5,})', html)
+    if not m:
+        raise RuntimeError('從網址找不到商品編號：' + final)
+    return m.group(1)
+
+
+_SIZE_KEY = re.compile(r'name|spec|type|desc|value|label|title|size|option', re.I)
+_STOCK_KEY = re.compile(r'stock|qty|quantity|soldout|sold_out|canbuy|orderable|saleable|available', re.I)
+
+
+def _truthy(v):
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return v > 0
+    s = str(v).strip().lower()
+    if s in ('y', 'yes', 'true', 'instock', '有貨'):
+        return True
+    if s in ('n', 'no', 'false', 'outofstock', 'soldout', '售完', '缺貨', ''):
+        return False
+    try:
+        return float(s) > 0
+    except ValueError:
+        return None
+
+
+def _size_match(text, size):
+    return re.search(r'(?<![A-Z0-9])%s(?![A-Z0-9])' % re.escape(size.upper()), str(text).upper()) is not None
+
+
+def _walk(node, size, hits):
+    if isinstance(node, dict):
+        labels = [v for k, v in node.items() if isinstance(v, str) and _SIZE_KEY.search(k) and len(v) <= 40]
+        if any(_size_match(v, size) for v in labels):
+            for k, v in node.items():
+                if _STOCK_KEY.search(k) and not isinstance(v, (dict, list)):
+                    t = _truthy(v)
+                    if t is not None:
+                        hits.append((not t if re.search(r'sold', k, re.I) else t, '%s｜%s=%r' % (labels[0], k, v)))
+                        break
+        for v in node.values():
+            _walk(v, size, hits)
+    elif isinstance(node, list):
+        for v in node:
+            _walk(v, size, hits)
+
+
+def size_stock(html, size):
+    """回傳 (是否有貨 True/False/None, 判斷依據)。多色時任一色有貨就算有貨。"""
+    hits = []
+    for block in re.findall(r'<script[^>]*>(.*?)</script>', html, re.S):
+        block = block.strip()
+        if not block.startswith(('{', '[')):
+            continue
+        try:
+            _walk(json.loads(block), size, hits)
+        except ValueError:
+            continue
+    if hits:
+        return any(h[0] for h in hits), '；'.join(h[1] for h in hits[:5])
+    # 備案：頁面文字裡「L(售完)」「L 缺貨」這類寫法
+    text = re.sub(r'<[^>]+>', ' ', re.sub(r'<script.*?</script>|<style.*?</style>', ' ', html, flags=re.S))
+    text = re.sub(r'\s+', ' ', text)
+    pat = r'(?<![A-Za-z0-9])%s(?![A-Za-z0-9])' % re.escape(size)
+    near = [text[max(0, m.start() - 15):m.end() + 15] for m in re.finditer(pat, text)]
+    if any(re.search(r'售完|缺貨|補貨中|無庫存', s) for s in near):
+        return False, '頁面文字：' + ' / '.join(near[:3])
+    return None, '找不到尺寸資料（找到 %d 處 %s）' % (len(near), size)
+
+
+def check_sizes(state, dry_run=False):
+    data = state.setdefault('sizes', {})
+    for w in SIZE_WATCH:
+        for size in w['sizes']:
+            key = '%s|%s' % (w['url'], size)
+            rec = data.setdefault(key, {'fails': 0})
+            try:
+                code = rec.get('code') or goods_code(w['url'])
+                rec['code'] = code
+                link = 'https://www.momoshop.com.tw/goods/GoodsDetail.jsp?i_code=' + code
+                _, html = get_html(link)
+                ok, how = size_stock(html, size)
+                if ok is None:
+                    raise RuntimeError(how)
+            except Exception as e:
+                log('尺寸檢查失敗：', w['name'], size, e)
+                if not dry_run:
+                    rec['fails'] = rec.get('fails', 0) + 1
+                    if rec['fails'] == FAIL_ALERT_AFTER:
+                        notify('尺寸監測讀不到資料', '%s %s 號\n%s' % (w['name'], size, e), tags=['warning'])
+                continue
+            time.sleep(2)
+            log('尺寸 %s %s：%s（%s）' % (w['name'], size, '有貨' if ok else '缺貨', how))
+            if dry_run:
+                continue
+            rec['fails'] = 0
+            now = int(time.time() * 1000)
+            prev = rec.get('in_stock')
+            if prev == ok:
+                continue
+            hist = rec.setdefault('history', [])
+            hist.append([now, ok])
+            del hist[:-30]
+            since, rec['in_stock'], rec['since'] = rec.get('since'), ok, now
+            if prev is None:
+                notify('開始監測 %s 號' % size, '%s\n目前：%s\n%s' % (w['name'], '有貨' if ok else '缺貨', link),
+                       click=link, tags=['eyes'])
+            elif ok:
+                gone = '（缺貨約 %.1f 天）' % ((now - since) / 86400000) if since else ''
+                notify('%s 號補貨了！快搶' % size, '%s%s\n%s' % (w['name'], gone, link),
+                       click=link, tags=['rotating_light'], priority=5)
+            else:
+                notify('%s 號又售完了' % size, '%s\n%s' % (w['name'], link), click=link, tags=['x'])
+
+
 def wanted(name):
     low = name.lower()
     return any(k in low for k in INCLUDE) and not any(k in low for k in EXCLUDE)
@@ -277,9 +410,14 @@ def check(dry_run=False):
     if state is not None and not dry_run:
         send_reminders(state)
         check_shop(state)
+        try:
+            check_sizes(state)
+        except Exception as e:  # 尺寸監測出錯不影響陀螺監測
+            log('尺寸監測錯誤：', e)
         save_state(state)
     if dry_run:
         check_shop({}, dry_run=True)
+        check_sizes({}, dry_run=True)
     try:
         found = collect()
         if not found:
@@ -363,6 +501,9 @@ def main():
     if '--test' in args:
         notify('MOMO 監測測試', '收到這則代表推播設定成功！', click='https://www.momoshop.com.tw/', tags=['bell'])
         log('已送出測試推播到', NTFY_TOPIC)
+        return
+    if '--sizes' in args:
+        check_sizes({}, dry_run=True)
         return
     if '--list' in args:
         state = load_state() or {}
