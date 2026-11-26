@@ -9,6 +9,7 @@
     python3 momo_watch.py --dry-run    只印結果，不推播、不記錄
     python3 momo_watch.py --list       把即將開賣清單推播一次
     python3 momo_watch.py --sizes      只檢查 SIZE_WATCH 的尺寸庫存並印出判斷依據（不推播）
+    python3 momo_watch.py --sizes-only 只跑尺寸補貨監測，紀錄存在 sizes.json（GitHub Actions 用）
 
 第一次執行只會把目前所有商品記下來（送一則「開始監測」），之後出現沒看過的商品才會通知。
 FUNBOX 的預購商品會記下開賣時間，開賣前 REMIND_BEFORE 分鐘再提醒一次。
@@ -410,14 +411,9 @@ def check(dry_run=False):
     if state is not None and not dry_run:
         send_reminders(state)
         check_shop(state)
-        try:
-            check_sizes(state)
-        except Exception as e:  # 尺寸監測出錯不影響陀螺監測
-            log('尺寸監測錯誤：', e)
         save_state(state)
     if dry_run:
         check_shop({}, dry_run=True)
-        check_sizes({}, dry_run=True)
     try:
         found = collect()
         if not found:
@@ -504,6 +500,18 @@ def main():
         return
     if '--sizes' in args:
         check_sizes({}, dry_run=True)
+        return
+    if '--sizes-only' in args:
+        # 只跑尺寸監測，紀錄另存 sizes.json（給 GitHub Actions 用，跟 NAS 的 seen.json 分開）
+        path = os.environ.get('SIZE_STATE_FILE', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sizes.json'))
+        try:
+            with open(path, encoding='utf-8') as f:
+                state = json.load(f)
+        except (OSError, ValueError):
+            state = {}
+        check_sizes(state)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False, indent=1)
         return
     if '--list' in args:
         state = load_state() or {}

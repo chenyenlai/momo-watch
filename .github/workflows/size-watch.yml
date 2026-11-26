@@ -1,0 +1,35 @@
+name: MOMO 尺寸補貨監測
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'   # 約每 15 分鐘（GitHub 常會延遲）
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 要把 sizes.json（庫存紀錄）存回倉庫
+
+concurrency:
+  group: size-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 檢查尺寸庫存
+        run: python3 momo_watch.py --sizes-only
+
+      - name: 儲存記錄
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          [ -f sizes.json ] && git add sizes.json
+          if ! git diff --cached --quiet; then
+            git commit -m "更新尺寸庫存記錄"
+            git pull --rebase -q && git push
+          fi
