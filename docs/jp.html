@@ -130,7 +130,7 @@ const app = document.getElementById('app');
 const esc = (s) => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 const R = { pick: a => a[Math.floor(Math.random() * a.length)], shuffle: a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; } };
 // 漢字[讀音] → 上方小字；plain 是去掉讀音的文字
-const ruby = (s) => esc(s).replace(/([0-9々一-鿿]+)\[([^\]]+)\]/g, (m, b, r) => S.furi || /^[0-9]+$/.test(b) ? '<ruby>' + b + '<rt>' + r + '</rt></ruby>' : b);   // 數字的念法一律顯示
+const ruby = (s) => esc(s).replace(/([0-9々一-鿿]+)\[([^\]]+)\]/g, (m, b, r) => S.furi || /^[0-9]/.test(b) ? '<ruby>' + b + '<rt>' + r + '</rt></ruby>' : b);   // 數字開頭的（價錢、時間、日期）念法一律顯示
 const plain = (s) => s.replace(/\[[^\]]*\]/g, '');
 // iPhone Safari：只有手指點下去時才能開始播放；所以第一次點畫面就用同一個播放器先播一段無聲，之後自動播放才不會被擋
 const audio = new Audio(), SILENT = 'silent.mp3';
@@ -154,18 +154,18 @@ const ORD = (no) => typeof no === 'number' ? no : 100 + parseInt(String(no).slic
 const LN = (L) => typeof L.no === 'number' ? '第 ' + L.no + ' 課' : L.short;
 const PACK_SOON = [['③', '時間・星期・日期', '🚃 車站時刻、🏨 飯店入住'], ['④', '量詞：ひとつ、〜人、〜枚、〜本', '🍜 餐廳點餐'], ['⑤', '有、在、位置（上・下・前・後・旁邊）', '⛩️ 問路：トイレは どこに ありますか'], ['⑥', '常用形容詞：顏色、大小、天氣、感覺', '🛍️ 購物'], ['⑦', '人、家人、身體', '🆘 身體不舒服'], ['⑧', '常用動詞（日常生活）', '🏨 飯店、觀光']];
 const SOON = ['', '', '', '', '去哪裡、怎麼去（へ・で）', '每天做什麼（を・動詞變化・副詞）', '形容詞、想要～（たい）', '有、在、喜歡（が・あります・います）', '給、收到（あげます・もらいます）', '數東西（量詞）', '昨天、以前（過去式）', '比較（より・ほど・いちばん）', '動詞的應用（提議、一邊～一邊～）'];
-const NOSPLIT = ['この', 'その', 'あの', 'どの', 'いっしょに', 'すみません', 'ちがいます', 'ください', 'よろしく', 'はじめまして', 'ありません', 'ちょっと…', 'いつも', 'とても'];
+const NOSPLIT = ['ありませんでした', 'この', 'その', 'あの', 'どの', 'いっしょに', 'すみません', 'ちがいます', 'ください', 'よろしく', 'はじめまして', 'ありません', 'ちょっと…', 'いつも', 'とても'];
 function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾的 です/ます 和助詞切開
   const body = jp.replace(/[。？！]$/, '');
   const out = [];
   body.split(/[ 、。]/).filter(Boolean).forEach(ch => {
     if (NOSPLIT.includes(plain(ch))) { out.push(ch); return; }
     const tail = []; let rest = ch;
-    const suf = ['ませんでした', 'ませんか', 'ましょう', 'ましたか', 'ました', 'ますか', 'ですか', 'ですね', 'ません', 'です', 'ます'].find(x => rest.endsWith(x) && plain(rest).length > x.length);
+    const suf = ['ませんでした', 'ませんか', 'ましょうか', 'ましょう', 'でしたか', 'でした', 'ましたか', 'ました', 'ますか', 'ですか', 'ですね', 'ません', 'です', 'ます'].find(x => rest.endsWith(x) && plain(rest).length > x.length);
     if (suf) { tail.unshift(suf); rest = rest.slice(0, -suf.length); }
-    const tai = ['たくない', 'たい'].find(x => rest.endsWith(x) && VSTEM.has(plain(rest.slice(0, -x.length))));   // 食べ｜たい
+    const tai = ['たくない', 'たい', 'ながら'].find(x => rest.endsWith(x) && VSTEM.has(plain(rest.slice(0, -x.length))));   // 食べ｜たい、聞き｜ながら
     if (tai) { tail.unshift(tai); rest = rest.slice(0, -tai.length); }
-    const pt = ['では', 'じゃ', 'は', 'を', 'に', 'で', 'と', 'の', 'が', 'へ', 'も'].find(x => rest.endsWith(x) && plain(rest).length > x.length);
+    const pt = ['では', 'じゃ', 'より', 'ほど', 'から', 'まで', 'は', 'を', 'に', 'で', 'と', 'の', 'が', 'へ', 'も'].find(x => rest.endsWith(x) && plain(rest).length > x.length);
     if (pt) { tail.unshift(pt); rest = rest.slice(0, -pt.length); }
     out.push(rest, ...tail);
   });
@@ -173,8 +173,8 @@ function chipsOf(jp) {   // 排句子用的詞卡：照空格切，再把句尾�
 }
 // 排句子：日文的語序比較自由。「名詞＋を/に/で/へ/が/も」這種詞組、和 いっしょに、毎日 這類時間副詞可以換位置；
 // 其他（主題「～は」放最前面、句尾的述語、の・と・この 連著後面的字）位置不能動。回傳 'exact'、'alt'（也對）或 false
-const ATT = new Set(['では', 'じゃ', 'は', 'を', 'に', 'で', 'と', 'の', 'が', 'へ', 'も', 'ませんでした', 'ませんか', 'ましょう', 'ましたか', 'ました', 'ますか', 'ですか', 'ですね', 'ません', 'です', 'ます', 'たい', 'たくない']);
-const MOVE_ADV = new Set(['いっしょに', 'いつも', 'よく', 'ときどき', '毎日', '毎朝', '今日', '明日', '昨日', '来週', '今', '全部で']);
+const ATT = new Set(['ましょうか', 'でしたか', 'でした', 'ながら', 'より', 'ほど', 'から', 'まで', 'では', 'じゃ', 'は', 'を', 'に', 'で', 'と', 'の', 'が', 'へ', 'も', 'ませんでした', 'ませんか', 'ましょう', 'ましたか', 'ました', 'ますか', 'ですか', 'ですね', 'ません', 'です', 'ます', 'たい', 'たくない']);
+const MOVE_ADV = new Set(['もう', 'いっしょに', 'いつも', 'よく', 'ときどき', '毎日', '毎朝', '今日', '明日', '昨日', '来週', '今', '全部で']);
 function groupsOf(chips) {   // 詞卡 → 詞組（每組是 chips 的索引）
   const gs = [];
   chips.forEach((c, k) => { if (ATT.has(plain(c)) && gs.length) gs[gs.length - 1].push(k); else gs.push([k]); });
